@@ -1,0 +1,122 @@
+#!/bin/bash
+
+SCRIPTDIR=$( (cd -P $(dirname $0) && pwd) )
+COREDIR=$( dirname $SCRIPTDIR  )
+corename=$( basename $COREDIR )
+DATADIR=${COREDIR}/data
+BASEDIR=$( dirname $COREDIR )
+
+# load the shared bash functions log, vlog and Verbose
+. $BASEDIR/bin/outputfuncs.bash
+
+# load the function for posting solr add documents to a solr server
+. $BASEDIR/bin/postfuncs.bash
+
+verbose=
+force=
+test=
+index=test
+while getopts :vfti: opt
+ do
+      case $opt in
+          v) verbose=-v;;
+          t) test=-t;;
+          f) force=-f;;
+          i) index=$OPTARG
+      esac
+done
+shift $((OPTIND-1))
+
+if [ "$force" == "-f" ] ; then
+    Verbose "Forcing index rebuild with -f flag"
+fi
+
+
+query=`cat $SCRIPTDIR/query.txt | sed -e 's/["]/%22/g' -e 's/[*]/%2A/g' -e 's/[[]/%5B/g' -e 's/[]]/%5D/g' -e 's/ /+/g'`
+parms='&rows=10000'
+downloaded=0
+
+for line in `cat $SCRIPTDIR/cores_to_process`
+do
+    solrname=`echo $line| cut -d ':' -f1`
+    transform=`echo $line| cut -d ':' -f2`
+    urlname=`echo $line| cut -d ':' -f3`
+    libraurlfile=`echo $line| cut -d ':' -f4`
+
+    if [[ "$index" =~ $solrname ]]; then
+        hostname=`cat $SCRIPTDIR/$libraurlfile | sed -e 's#^http[s]\?://##' -e 's#[:/].*$##'`
+        ip=`resolve_private.bash $hostname`
+        LIBRAURL=`cat $SCRIPTDIR/$libraurlfile | sed -e "s#\(^http[s]\?://\)[^:/]*\(.*\)#\1${ip}\2#"`
+
+        date=`$SCRIPTDIR/getlastupdatedate $LIBRAURL`
+        lastupdate=`cat $DATADIR/lastupdate_$solrname`
+        lastupdateNoT=`cat $DATADIR/lastupdate_$solrname | sed -e 's/T/ /'`
+        datequeryedited=`date -u -r $SCRIPTDIR/query.txt  "+%Y-%m-%dT%T.0Z"`
+        
+        if [[ "$date" > "$lastupdate" || "$datequeryedited" > "$lastupdate" || "$force" == "-f" ]]; then
+            Verbose "Backing up the libraoc/solr record dump from the last update"
+            mv $DATADIR/record_${solrname}_no_pdf.xml $DATADIR/record_${solrname}_no_pdf.xml.bak 2> /dev/null
+            Verbose "Querying the libraoc solr for all records matching the query in the query file"
+            Verbose "Using URL of: $LIBRAURL?q=$query$parms"
+            curl -s "$LIBRAURL?q=$query$parms" | xmllint --format - >  $DATADIR/record_${solrname}_no_pdf.xml
+            downloaded=1
+        
+            Verbose "Storing last indexed date"
+            echo `date -u -r "$DATADIR/record_${solrname}_no_pdf.xml" "+%Y-%m-%dT%T.0Z"` > $DATADIR/lastupdate_${solrname}
+        
+        else
+            Verbose "No new records detected, no retrieval required"
+        fi
+
+        datescriptedited=`date -u -r $SCRIPTDIR/$transform  "+%Y-%m-%dT%T.0Z"`
+        datelasttransform=`date -u -r $DATADIR/virgo_solr_add_record_no_pdf_${solrname}.xml  "+%Y-%m-%dT%T.0Z"`
+        datelastdownload=`cat $DATADIR/lastupdate_${solrname}`
+
+        if [[ "$force" == "-f" ]]; then
+            Verbose "Forcing $solrname index rebuild with -f flag"
+        else
+            Verbose "Checking whether $corename needs reindexing in $solrname index"
+            if [[ "$datelastdownload" > "$datelasttransform" ]] ; then
+                Verbose "Records downloaded more recently than the last time the $solrname index was updated:  $datelastdownload > $datelasttransform "
+            fi
+            if [[ "$datescriptedited" > "$datelasttransform" ]] ; then
+                Verbose "LibraToVirgo transform for the $solrname index is newer than last update: $datescriptedited > $datelasttransform "
+            fi
+        fi
+
+        if [[ "$datelastdownload" > "$datelasttransform" || "$datescriptedited" > "$datelasttransform" || "$force" == "-f" ]]
+        then
+            Verbose "Backing up the virgo/solr add document from the last update for $solrname index"
+            mv $DATADIR/virgo_solr_add_record_no_pdf_${solrname}.xml $DATADIR/virgo_solr_add_record_no_pdf_${solrname}.xml.bak 2> /dev/null
+
+            Verbose "Transforming the libra/solr record dump into a new virgo/solr add document"
+            java  -jar $BASEDIR/bin/saxon9.jar  $DATADIR/record_${solrname}_no_pdf.xml  $SCRIPTDIR/$transform > $DATADIR/virgo_solr_add_record_no_pdf_${solrname}.xml 2>&1 | vlog 
+
+            URL=${!urlname}
+            Verbose "Sending the virgo/solr add document to libraoc core of $solrname index"
+            if [[ "$test" != "-t" ]]
+            then
+                PostToIndexIfCoreExists "$URL" "$corename" "$DATADIR/virgo_solr_add_record_no_pdf_${solrname}.xml" ""
+            else
+                Verbose "PostToIndexIfCoreExists \"$URL\" \"$corename\" \"$DATADIR/virgo_solr_add_record_no_pdf_${solrname}.xml\" \"\""
+            fi
+            echo "<delete><query>date_indexed_facet:[* TO "`date -d "$lastupdateNoT" "+%Y%m%d%H%M"`"]</query></delete>" > $DATADIR/delete_old_records.xml
+            Verbose "Sending delete old records query to libraoc core of $solrname index and optimizing that core"
+            if [[ "$test" != "-t" ]]
+            then
+                PostToIndexIfCoreExists "$URL" "$corename" "$DATADIR/delete_old_records.xml" "optimize"
+            else
+                Verbose "PostToIndexIfCoreExists \"$URL\" \"$corename\" \"$DATADIR/delete_old_records.xml\" \"optimize\""
+            fi
+        else 
+            Verbose "Transformed result for index $solrname newer than last update: $datelastdownload"
+        fi
+    fi
+done
+    
+if [[ "$downloaded" == "1" ]] ; then
+    Verbose "Now transform and upload record to Virgo4 staging and production"
+    /lib_content23/solr73_virgo4/virgo4devhome/index_all_libra_oc $verbose
+fi
+
+Verbose "Done updating core $corename"
