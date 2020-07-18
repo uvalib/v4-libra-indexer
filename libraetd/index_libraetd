@@ -1,0 +1,144 @@
+#!/bin/bash
+
+SCRIPTDIR=$( (cd -P $(dirname $0) && pwd) )
+corename=$( basename $SCRIPTDIR )
+DATADIR=${SCRIPTDIR}/data
+BASEDIR=$( dirname $SCRIPTDIR )
+echo "SCRIPTDIR = $SCRIPTDIR"
+echo "DATADIR = $DATADIR"
+echo "BASEDIR = $BASEDIR"
+echo "corename = $corename"
+
+# load the shared bash functions log, vlog and Verbose
+. $BASEDIR/outputfuncs.bash
+
+verbose=
+force=
+test=
+index=staging:production
+while getopts :vfti: opt
+ do
+      case $opt in
+          v) verbose=-v;;
+          t) test=-t;;
+          f) force=-f;;
+          i) index=$OPTARG
+      esac
+done
+shift $((OPTIND-1))
+
+if [ "$force" == "-f" ] ; then
+    Verbose "Forcing index rebuild with -f flag"
+fi
+
+if [ "$AWS_ACCESS_KEY_ID" == "" ] ; then
+    Echo "environment variable AWS_ACCESS_KEY_ID must be defined"
+    exit 1
+fi
+if [ "$AWS_SECRET_ACCESS_KEY" == "" ] ; then
+    Echo "environment variable AWS_SECRET_ACCESS_KEY must be defined"
+    exit 1
+fi
+#if [ "$AWS_DEFAULT_REGION" == "" ] ; then
+#    Echo "environment variable AWS_DEFAULT_REGION must be defined"
+#    exit 1
+#fi
+if [ "$AWS_REGION" == "" ] ; then
+    Echo "environment variable AWS_REGION must be defined"
+    exit 1
+fi
+
+query=`cat $SCRIPTDIR/query.txt | sed -e 's/["]/%22/g' -e 's/[*]/%2A/g' -e 's/[[]/%5B/g' -e 's/[]]/%5D/g' -e 's/ /+/g'`
+parms='&rows=10000'
+downloaded=0
+
+mkdir -p $DATADIR
+
+for line in `cat $SCRIPTDIR/cores_to_process`
+do
+    solrname=`echo $line| cut -d '|' -f1`
+    transform=`echo $line| cut -d '|' -f2`
+    libraurlfile=`echo $line| cut -d '|' -f3`
+    s3bucket=`echo $line| cut -d '|' -f4`
+    s3deletebucket=`echo $line| cut -d '|' -f5`
+    solrurl=`echo $line | cut -d '|' -f6`
+
+    if [[ "$index" =~ $solrname ]]; then
+        hostname=`cat $SCRIPTDIR/$libraurlfile | sed -e 's#^http[s]\?://##' -e 's#[:/].*$##'`
+        ip=`resolve_private.bash $hostname`
+        LIBRAURL=`cat $SCRIPTDIR/$libraurlfile | sed -e "s#\(^http[s]\?://\)[^:/]*\(.*\)#\1${ip}\2#"`
+
+        date=`$SCRIPTDIR/getlastupdatedate $LIBRAURL`
+        lastupdate=`cat $DATADIR/lastupdate_$solrname`
+        lastupdateNoT=`cat $DATADIR/lastupdate_$solrname | sed -e 's/T/ /'`
+        datequeryedited=`date -u -r $SCRIPTDIR/query.txt  "+%Y-%m-%dT%T.0Z"`
+
+        if [[ "$date" > "$lastupdate" || "$datequeryedited" > "$lastupdate" || "$force" == "-f" ]]; then
+            Verbose "Backing up the libra2/solr record dump from the last update"
+            mv $DATADIR/libraetd_${solrname}_data.xml $DATADIR/libraetd_${solrname}_data.xml.bak 2> /dev/null
+            Verbose "Querying the libra2 solr for all records matching the query in the query file"
+            Verbose "Using URL of: $LIBRAURL?q=$query$parms"
+            curl -s "$LIBRAURL?q=$query$parms" | xmllint --format - >  $DATADIR/libraetd_${solrname}_data.xml
+            downloaded=1
+
+            Verbose "Storing last indexed date"
+            echo `date -u -r "$DATADIR/libraetd_${solrname}_data.xml" "+%Y-%m-%dT%T.0Z"` > $DATADIR/lastupdate_${solrname}
+
+        else
+            Verbose "No new records detected, no retrieval required"
+        fi
+
+        datescriptedited=`date -u -r $SCRIPTDIR/$transform  "+%Y-%m-%dT%T.0Z"`
+        datelasttransform=`date -u -r $DATADIR/virgo4_libraetd_${solrname}.xml  "+%Y-%m-%dT%T.0Z"`
+        datelastdownload=`cat $DATADIR/lastupdate_${solrname}`
+
+        if [[ "$force" == "-f" ]]; then
+            Verbose "Forcing $solrname index rebuild with -f flag"
+        else
+            Verbose "Checking whether $corename needs reindexing in $solrname index"
+            if [[ "$datelastdownload" > "$datelasttransform" ]] ; then
+                Verbose "Records downloaded more recently than the last time the $solrname index was updated:  $datelastdownload > $datelasttransform "
+            fi
+            if [[ "$datescriptedited" > "$datelasttransform" ]] ; then
+                Verbose "LibraToVirgo transform for the $solrname index is newer than last update: $datescriptedited > $datelasttransform "
+            fi
+        fi
+
+        if [[ "$datelastdownload" > "$datelasttransform" || "$datescriptedited" > "$datelasttransform" || "$force" == "-f" ]]
+        then
+            Verbose "Backing up the virgo/solr add document from the last update for $solrname index"
+            mv $DATADIR/virgo4_libraetd_${solrname}.xml $DATADIR/virgo4_libraetd_${solrname}.xml.bak  2> /dev/null
+
+            Verbose "Transforming the libra/solr record dump into a new virgo/solr add document"
+
+            java  -jar $BASEDIR/saxon9.jar  $DATADIR/libraetd_${solrname}_data.xml  $SCRIPTDIR/$transform |
+                 sed -e 's/\\n/\&#10;/g' -e 's/<?xml version="1.0" encoding="UTF-8"?>//'  > $DATADIR/virgo4_libraetd_${solrname}.xml 2>&1 | vlog
+
+            Verbose "Now figure out if any records need to be deleted"
+            cat $DATADIR/virgo4_libraetd_${solrname}.xml | egrep '"id"' | sed -e 's/[^>]*>//' -e 's/<.*$//' | sort > $DATADIR/cur_ids_being_added.ids
+            curl -s "$solrurl/select?fl=id&q=data_source_f%3Alibraetd&rows=10000" | egrep '"id":' | sed -e 's/.*":"//' -e 's/".*$//' | sort  > $DATADIR/cur_ids_in_solr.ids
+            diff $DATADIR/cur_ids_in_solr.ids $DATADIR/cur_ids_being_added.ids | egrep '<' | sed -e 's/< //' > $DATADIR/records_to_delete_${corename}_${solrname}.ids
+
+            if [ -s $DATADIR/records_to_delete_${corename}_${solrname}.ids ] ; then
+                Verbose "Some records in virgo solr that are not in the new dump of all records"
+                if [ "$test" == "-t" ]; then
+                    Echo "aws s3 cp $DATADIR/records_to_delete_${corename}_${solrname}.ids ${s3deletebucket}/records_to_delete_${corename}_${solrname}.ids"
+                else
+                    aws s3 cp $DATADIR/records_to_delete_${corename}_${solrname}.ids ${s3deletebucket}/records_to_delete_${corename}_${solrname}.ids
+                fi
+            else
+               Verbose "    No records need to be deleted"
+            fi
+
+            Verbose "Upload transformed records to ${solrname} S3 bucket"
+            if [ "$test" == "-t" ]; then
+                Echo "aws s3 cp $DATADIR/virgo4_libraetd_${solrname}.xml ${s3bucket}/virgo4_libraetd_${solrname}.xml"
+            else
+                aws s3 cp $DATADIR/virgo4_libraetd_${solrname}.xml ${s3bucket}/virgo4_libraetd_${solrname}.xml
+            fi
+
+        fi
+    fi
+done
+    
+Verbose "Done updating core $corename"

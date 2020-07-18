@@ -1,0 +1,1 @@
+http://solr-01-staging.private.staging:8080/solr/libra2/select
