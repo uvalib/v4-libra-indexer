@@ -1,0 +1,13 @@
+#!/bin/bash
+# this is the script called by cron,  all it does is create a results file
+# and invoke the index_libra_all script, (in verbose mode) with the output
+# being routed to that results file.
+SCRIPTDIR=$( (cd -P $(dirname $0) && pwd) )
+RESULTSDIR=$SCRIPTDIR/results
+
+mkdir -p $RESULTSDIR
+
+results_file=$RESULTSDIR/results_nightly_`/bin/date +%Y%m%d`.txt
+
+$SCRIPTDIR/index_libra_all -v >> $results_file 2>&1
+

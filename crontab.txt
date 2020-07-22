@@ -1,0 +1,2 @@
+0,30 * * * *    . /usr/local/projects/deployer/recordsrc/bin/aws_settings.bash; /lib_content23/solr73_virgo4/v4-libra-indexer/index_libra_all_for_cron
+
