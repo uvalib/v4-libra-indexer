@@ -3,7 +3,7 @@
 SCRIPTDIR=$( (cd -P $(dirname $0) && pwd) )
 corename=$( basename $SCRIPTDIR )
 DATADIR=${SCRIPTDIR}/data
-BASEDIR=$( dirname $SCRIPTDIR )
+BASEDIR=$( dirname $SCRIPTDIR )/common
 
 # load the shared bash functions log, vlog and Verbose
 . $BASEDIR/outputfuncs.bash
@@ -45,7 +45,7 @@ if [ "$AWS_REGION" == "" ] ; then
 fi
 
 query=`cat $SCRIPTDIR/query.txt | sed -e 's/["]/%22/g' -e 's/[*]/%2A/g' -e 's/[[]/%5B/g' -e 's/[]]/%5D/g' -e 's/ /+/g'`
-parms='&rows=10000'
+parms='&rows=10000&wt=xml'
 downloaded=0
 
 mkdir -p $DATADIR
@@ -61,7 +61,7 @@ do
 
     if [[ "$index" =~ $solrname ]]; then
         hostname=`cat $SCRIPTDIR/$libraurlfile | sed -e 's#^http[s]\?://##' -e 's#[:/].*$##'`
-        ip=`resolve_private.bash $hostname`
+        ip=`$BASEDIR/resolve_private.bash $hostname`
         LIBRAURL=`cat $SCRIPTDIR/$libraurlfile | sed -e "s#\(^http[s]\?://\)[^:/]*\(.*\)#\1${ip}\2#"`
 
         date=`$SCRIPTDIR/getlastupdatedate $LIBRAURL`

@@ -1,0 +1,17 @@
+#!/bin/bash
+
+#talks to the solr search engine of libra (at ir.lib.virginia.edu) to find the date of the most recent update
+SCRIPTDIR=$( (cd -P $(dirname $0) && pwd) )
+corename=$( basename $SCRIPTDIR )
+DATADIR=${SCRIPTDIR}/data
+BASEDIR=$( dirname $SCRIPTDIR )/common
+
+DATAVERSEURL="http://dataverse.lib.virginia.edu:8983/solr/collection1/select"
+
+query=`cat $SCRIPTDIR/query.txt | sed -e 's/["]/%22/g' -e 's/ /+/g' -e 's/:/%3A/g' `
+parms='&rows=4000&wt=xml&indent=true'
+
+#url encode the querystring from the file data/query.txt
+getDate='&rows=1&wt=xml&fl=dateSort&sort=dateSort+desc'
+
+curl -s "$DATAVERSEURL?q=$query$getDate" | xmllint --format - | egrep '<date' | sed -e 's/^.*<date[^>]*>//' -e 's:</date>::'

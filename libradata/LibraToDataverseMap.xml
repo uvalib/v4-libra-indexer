@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<dataversemap>
+    <urlbase>https://dataverse.lib.virginia.edu/dataset.xhtml?persistentId=</urlbase>
+    <entry>
+        <libra>libra-oa:8239</libra>
+        <dataverse>doi:10.18130/V3/LWPBIY</dataverse>
+    </entry>
+    <entry>
+        <libra>libra-oa:7509</libra>
+        <dataverse>doi:10.18130/V3/XZ2YLD</dataverse>
+    </entry>
+    <entry>
+        <libra>libra-oa:6715</libra>
+        <dataverse></dataverse>
+    </entry>
+    <entry>
+        <libra>libra-oa:3500</libra>
+        <dataverse>doi:10.18130/V3/HOOJSE</dataverse>
+    </entry>
+    <entry>
+        <libra>libra-oa:2966</libra>
+        <dataverse>doi:10.18130/V3/YIZOVR</dataverse>
+    </entry>
+    <entry>
+        <libra>libra-oa:3272</libra>
+        <dataverse>doi:10.18130/V3/NEPGOL</dataverse>
+    </entry>
+    <entry>
+        <libra>libra-oa:2781</libra>
+        <dataverse>doi:10.18130/V3/QAIK3R</dataverse>
+    </entry>
+    <entry>
+        <libra>libra-oa:2638</libra>
+        <dataverse>doi:10.18130/V3/2IVQ9Z</dataverse>
+    </entry>
+</dataversemap>
