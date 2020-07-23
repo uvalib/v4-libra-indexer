@@ -1,1 +1,0 @@
-http://solr-01-production.private.production:8080/solr/libraoc/select
