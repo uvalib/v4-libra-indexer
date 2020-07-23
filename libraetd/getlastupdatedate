@@ -11,6 +11,6 @@ if [[ "$LIBRAURL" == "" ]] ; then
 fi
 #url encode the querystring from the file data/query.txt
 query=`cat $SCRIPTDIR/query.txt | sed -e 's/["]/%22/g' -e 's/[*]/%2A/g' -e 's/[[]/%5B/g' -e 's/[]]/%5D/g' -e 's/ /+/g'`
-getDate='&rows=1&fl=timestamp&sort=timestamp+desc'
+getDate='&rows=1&fl=timestamp&sort=timestamp+desc&wt=xml'
 
 curl -s "$LIBRAURL?q=$query$getDate" | xmllint --format - | egrep '<date' | sed -e 's/^.*<date[^>]*>//' -e 's:</date>::'

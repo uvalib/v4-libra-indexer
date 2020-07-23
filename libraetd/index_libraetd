@@ -52,19 +52,23 @@ mkdir -p $DATADIR
 
 for line in `cat $SCRIPTDIR/cores_to_process`
 do
+    year=`date "+%Y"`
     solrname=`echo $line| cut -d '|' -f1`
     transform=`echo $line| cut -d '|' -f2`
     libraurlfile=`echo $line| cut -d '|' -f3`
-    s3bucket=`echo $line| cut -d '|' -f4`
-    s3deletebucket=`echo $line| cut -d '|' -f5`
+    s3bucket=`echo $line| cut -d '|' -f4 | sed -e "s/2020/$year/"`
+    s3deletebucket=`echo $line| cut -d '|' -f5 | sed -e "s/2020/$year/"`
     solrurl=`echo $line | cut -d '|' -f6`
 
     if [[ "$index" =~ $solrname ]]; then
         hostname=`cat $SCRIPTDIR/$libraurlfile | sed -e 's#^[^:]*://##' -e 's#[:/].*$##'`
         ip=`$BASEDIR/resolve_private.bash $hostname`
         LIBRAURL=`cat $SCRIPTDIR/$libraurlfile | sed -e "s#${hostname}#${ip}#"`
+        Verbose "Resolved LibraURL to: $LIBRAURL"
 
         date=`$SCRIPTDIR/getlastupdatedate $LIBRAURL`
+        Verbose "Last update date for Libra is: $date"
+
         lastupdate=`cat $DATADIR/lastupdate_$solrname`
         lastupdateNoT=`cat $DATADIR/lastupdate_$solrname | sed -e 's/T/ /'`
         datequeryedited=`date -u -r $SCRIPTDIR/query.txt  "+%Y-%m-%dT%T.0Z"`

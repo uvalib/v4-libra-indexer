@@ -54,11 +54,12 @@ mkdir -p $DATADIR
 
 for line in `cat $SCRIPTDIR/cores_to_process`
 do
+    year=`date "+%Y"`
     solrname=`echo $line| cut -d '|' -f1`
     transform=`echo $line| cut -d '|' -f2`
     libraurlfile=`echo $line| cut -d '|' -f3`
-    s3bucket=`echo $line| cut -d '|' -f4`
-    s3deletebucket=`echo $line| cut -d '|' -f5`
+    s3bucket=`echo $line| cut -d '|' -f4 | sed -e "s/2020/$year/"`
+    s3deletebucket=`echo $line| cut -d '|' -f5 | sed -e "s/2020/$year/"`
     solrurl=`echo $line | cut -d '|' -f6`
 
     if [[ "$index" =~ $solrname ]]; then
