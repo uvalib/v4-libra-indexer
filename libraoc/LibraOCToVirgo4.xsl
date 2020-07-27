@@ -280,7 +280,7 @@
                     <field name="sponsoring_agency_tsearch_stored"><xsl:value-of select="."/></field>
                 </xsl:for-each>
                 <xsl:for-each select="distinct-values(arr[@name='rights_display_ssm']/str)">
-                    <field name="rights_tsearch_stored"><xsl:value-of select="."/></field>
+                    <field name="rights_tsearchf_stored"><xsl:value-of select="."/></field>
                 </xsl:for-each>
                 <xsl:if test="not(arr[@name='rights_url_ssm']/str)">
                     <field name="rs_uri_a">http://rightsstatements.org/vocab/InC/1.0/</field>
