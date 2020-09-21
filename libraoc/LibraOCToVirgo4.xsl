@@ -24,6 +24,58 @@
                 <field name="data_source_f_stored">libraoc</field>
                 <field name="pool_f_stored">thesis</field>
                 <!--             <field name="digital_collection_facet">Libra Repository</field>  -->
+		<xsl:variable name="additional_pool">
+                    <xsl:choose>
+                        <xsl:when test="arr[@name='resource_type_tesim']/str = 'Article'" >
+                            <xsl:text></xsl:text>
+                        </xsl:when>
+                        <xsl:when test="arr[@name='resource_type_tesim']/str = 'Audio'" >
+                            <xsl:text>sound_recordings</xsl:text>
+                        </xsl:when>
+                        <xsl:when test="arr[@name='resource_type_tesim']/str = 'Book'" >
+                            <xsl:text>catalog</xsl:text>
+                        </xsl:when>
+                        <xsl:when test="arr[@name='resource_type_tesim']/str = 'Conference Proceeding'" >
+                            <xsl:text></xsl:text>
+                        </xsl:when>
+                        <xsl:when test="arr[@name='resource_type_tesim']/str = 'Image'" >
+                            <xsl:text>Visual Materials</xsl:text>
+                        </xsl:when>
+                        <xsl:when test="arr[@name='resource_type_tesim']/str = 'Journals'" >
+                            <xsl:text>serials</xsl:text>
+                        </xsl:when>
+                        <xsl:when test="arr[@name='resource_type_tesim']/str = 'Map or Cartographic Material'" >
+                            <xsl:text>maps</xsl:text>
+                        </xsl:when>
+                        <xsl:when test="arr[@name='resource_type_tesim']/str = 'Part of Book'" >
+                            <xsl:text>catalog</xsl:text>
+                        </xsl:when>
+                        <xsl:when test="arr[@name='resource_type_tesim']/str = 'Poster'" >
+                            <xsl:text></xsl:text>
+                        </xsl:when>
+                        <xsl:when test="arr[@name='resource_type_tesim']/str = 'Presentation'" >
+                            <xsl:text></xsl:text>
+                        </xsl:when>
+                        <xsl:when test="arr[@name='resource_type_tesim']/str = 'Project'" >
+                            <xsl:text></xsl:text>
+                        </xsl:when>
+                        <xsl:when test="arr[@name='resource_type_tesim']/str = 'Report'" >
+                            <xsl:text></xsl:text>
+                        </xsl:when>
+                        <xsl:when test="arr[@name='resource_type_tesim']/str = 'Research Paper'" >
+                            <xsl:text></xsl:text>
+                        </xsl:when>
+                        <xsl:when test="arr[@name='resource_type_tesim']/str = 'Video'" >
+                            <xsl:text>video</xsl:text>
+                        </xsl:when>
+                        <xsl:when test="arr[@name='resource_type_tesim']/str = 'Other'" >
+                            <xsl:text></xsl:text>
+                        </xsl:when>
+                    </xsl:choose>
+		</xsl:variable>
+                <xsl:if test="not($additional_pool = '')">
+                    <field name="pool_f_stored"><xsl:value-of select="$additional_pool"/> </field>
+                </xsl:if>
                 <field name="location_f_stored">Internet Materials</field>
                 <field name="shadowed_location_f_stored">
                     <xsl:choose>
@@ -359,7 +411,7 @@
                             <xsl:text>Map</xsl:text>
                         </xsl:when>
                         <xsl:when test="arr[@name='resource_type_tesim']/str = 'Part of Book'" >
-                            <xsl:text>Book</xsl:text>
+                            <xsl:text>Book Chapter</xsl:text>
                         </xsl:when>
                         <xsl:when test="arr[@name='resource_type_tesim']/str = 'Poster'" >
                             <xsl:text>Visual Materials</xsl:text>
@@ -368,13 +420,13 @@
                             <xsl:text>Visual Materials</xsl:text>
                         </xsl:when>
                         <xsl:when test="arr[@name='resource_type_tesim']/str = 'Project'" >
-                            <xsl:text>Other Media</xsl:text>
+                            <xsl:text>Working Paper</xsl:text>
                         </xsl:when>
                         <xsl:when test="arr[@name='resource_type_tesim']/str = 'Report'" >
                             <xsl:text>Technical report</xsl:text>
                         </xsl:when>
                         <xsl:when test="arr[@name='resource_type_tesim']/str = 'Research Paper'" >
-                            <xsl:text>Document</xsl:text>
+                            <xsl:text>Working Paper</xsl:text>
                         </xsl:when>
                         <xsl:when test="arr[@name='resource_type_tesim']/str = 'Video'" >
                             <xsl:text>Streaming Video</xsl:text>
