@@ -141,6 +141,26 @@
                     <xsl:text>_</xsl:text><xsl:value-of select="replace(lower-case($firstName),'[ ]+','_')"/><xsl:text>/Thesis</xsl:text>
                 </field>
                 
+                <field name="work_title3_key_ssort_stored">
+                    <xsl:variable name="title">
+                        <xsl:call-template name="cleantitle" >
+                            <xsl:with-param name="title" select="arr[@name='title_tesim']/str[1]"/>
+                            <xsl:with-param name="language" select="arr[@name='language_tesim']/str"/>
+                        </xsl:call-template>
+                    </xsl:variable>
+                    <xsl:variable name="author">
+                        <xsl:value-of select="arr[@name='authors_tesim'][1]/str"/>
+                    </xsl:variable>
+                    <xsl:variable name="firstName">
+                        <xsl:value-of select="substring-before(substring-after($author, 'first_name&quot;:&quot;'), '&quot;')"/>
+                    </xsl:variable>
+                    <xsl:variable name="lastName">
+                        <xsl:value-of select="substring-before(substring-after($author, 'last_name&quot;:&quot;'), '&quot;')"/>
+                    </xsl:variable>
+                    <xsl:value-of select="replace(lower-case($title), '[- ]+', '_')"/><xsl:text>/</xsl:text><xsl:value-of select="replace(lower-case($lastName),'[ ]+','_')"/>
+                    <xsl:text>_</xsl:text><xsl:value-of select="replace(lower-case($firstName),'[ ]+','_')"/><xsl:text>/Thesis</xsl:text>
+                </field>
+                
                 <!--  stuff for authors -->
                 <xsl:for-each select="distinct-values(arr[@name = 'authors_tesim']/str)">
                     <xsl:sort select="translate(substring-before(substring-after(., 'index&quot;:'), ','), '\&quot;', '')" />
