@@ -25,7 +25,7 @@
                     <xsl:with-param name="dateTime"><xsl:value-of select='current-dateTime()'/></xsl:with-param>
                     </xsl:call-template>
                 </field>
-                <field name="data_source_f_stored">dataverse</field>
+                <field name="data_source_f_stored">libradata</field>
                 <field name="pool_f_stored">thesis</field>
                 
                 <field name="shadowed_location_f_stored">

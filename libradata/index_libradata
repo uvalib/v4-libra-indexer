@@ -6,6 +6,7 @@ SCRIPTDIR=$( (cd -P $(dirname $0) && pwd) )
 corename=$( basename $SCRIPTDIR )
 DATADIR=${SCRIPTDIR}/data
 BASEDIR=$( dirname $SCRIPTDIR )/common
+JAVA_MEM="-Xms512M -Xmx512M"
 
 # load the shared bash functions log, vlog and Verbose
 . $BASEDIR/outputfuncs.bash
@@ -47,7 +48,7 @@ if [ "$AWS_REGION" == "" ] ; then
 fi
 
 query=`cat $SCRIPTDIR/query.txt | sed -e 's/["]/%22/g' -e 's/[*]/%2A/g' -e 's/[[]/%5B/g' -e 's/[]]/%5D/g' -e 's/ /+/g'`
-parms='&rows=10000&wt=xml'
+parms='&rows=10000&wt=xml&fl=*'
 downloaded=0
 
 mkdir -p $DATADIR
@@ -61,59 +62,71 @@ do
     s3bucket=`echo $line| cut -d '|' -f4 | sed -e "s/2020/$year/"`
     s3deletebucket=`echo $line| cut -d '|' -f5 | sed -e "s/2020/$year/"`
     solrurl=`echo $line | cut -d '|' -f6`
+    url=`cat $SCRIPTDIR/$libraurlfile`
 
     if [[ "$index" =~ $solrname ]]; then
-        LIBRAURL=`cat $SCRIPTDIR/$libraurlfile`
+        if [[ $url =~ "private" ]]; then
+            hostname=`echo $url | sed -e 's#^[^:]*://##' -e 's#[:/].*$##'`
+            ip=`$BASEDIR/resolve_private.bash $hostname`
+            LIBRAURL=`cat $SCRIPTDIR/$libraurlfile | sed -e "s#${hostname}#${ip}#"`
+        else
+            LIBRAURL=$url
+        fi
+        Verbose "Resolved LibraURL to: $LIBRAURL"
 
         date=`$SCRIPTDIR/getlastupdatedate $LIBRAURL`
+        Verbose "Date of newest item in ${corename} is: $date"
+
         lastupdate=`cat $DATADIR/lastupdate_$solrname`
         lastupdateNoT=`cat $DATADIR/lastupdate_$solrname | sed -e 's/T/ /'`
         datequeryedited=`date -u -r $SCRIPTDIR/query.txt  "+%Y-%m-%dT%T.0Z"`
 
-        if [[ "$date" > "$lastupdate" || "$datequeryedited" > "$lastupdate" || "$force" == "-f" ]]; then
-            Verbose "Backing up the libra2/solr record dump from the last update"
-            mv $DATADIR/libradata_${solrname}_data.xml $DATADIR/libradata_${solrname}_data.xml.bak 2> /dev/null
-            Verbose "Querying the dataverse solr for all records matching the query in the query file"
+#        if [[ "$date" > "$lastupdate" || "$datequeryedited" > "$lastupdate" || "$force" == "-f" ]]; then
+            Verbose "Backing up the ${corename} solr record dump from the last update"
+            mv $DATADIR/${corename}_${solrname}_data.xml $DATADIR/${corename}_${solrname}_data.xml.bak 2> /dev/null
+            Verbose "Querying the ${corename} solr for all records matching the query in the query file"
             Verbose "Using URL of: $LIBRAURL?q=$query$parms"
-            curl -s "$LIBRAURL?q=$query$parms" | xmllint --format - >  $DATADIR/libradata_${solrname}_data.xml
+            curl -s "$LIBRAURL?q=$query$parms" | xmllint --format - | egrep -v "QTime" >  $DATADIR/${corename}_${solrname}_data.xml
             downloaded=1
 
-            Verbose "Storing last indexed date"
-            echo `date -u -r "$DATADIR/libradata_${solrname}_data.xml" "+%Y-%m-%dT%T.0Z"` > $DATADIR/lastupdate_${solrname}
+            cmp $DATADIR/${corename}_${solrname}_data.xml $DATADIR/${corename}_${solrname}_data.xml.bak
+            cmpresult=$?
 
-        else
-            Verbose "No new records detected, no retrieval required"
-        fi
+#        else
+#            Verbose "No new records detected, no retrieval required"
+#        fi
 
         datescriptedited=`date -u -r $SCRIPTDIR/$transform  "+%Y-%m-%dT%T.0Z"`
-        datelasttransform=`date -u -r $DATADIR/virgo4_libradata_${solrname}.xml  "+%Y-%m-%dT%T.0Z"`
+        datelasttransform=`date -u -r $DATADIR/virgo4_${corename}_${solrname}.xml  "+%Y-%m-%dT%T.0Z"`
         datelastdownload=`cat $DATADIR/lastupdate_${solrname}`
+        Verbose "Storing last download date"
+        echo `date -u -r "$DATADIR/${corename}_${solrname}_data.xml" "+%Y-%m-%dT%T.0Z"` > $DATADIR/lastupdate_${solrname}
 
         if [[ "$force" == "-f" ]]; then
             Verbose "Forcing $solrname index rebuild with -f flag"
         else
             Verbose "Checking whether $corename needs reindexing in $solrname index"
-            if [[ "$datelastdownload" > "$datelasttransform" ]] ; then
-                Verbose "Records downloaded more recently than the last time the $solrname index was updated:  $datelastdownload > $datelasttransform "
+            if [[ "$cmpresult" != "0" ]] ; then
+                Verbose "Records downloaded from $corename different from last time they were downloaded"
             fi
             if [[ "$datescriptedited" > "$datelasttransform" ]] ; then
                 Verbose "LibraToVirgo transform for the $solrname index is newer than last update: $datescriptedited > $datelasttransform "
             fi
         fi
 
-        if [[ "$datelastdownload" > "$datelasttransform" || "$datescriptedited" > "$datelasttransform" || "$force" == "-f" ]]
+        if [[ "$cmpresult" != "0" || "$datescriptedited" > "$datelasttransform" || "$force" == "-f" ]]
         then
             Verbose "Backing up the virgo/solr add document from the last update for $solrname index"
-            mv $DATADIR/virgo4_libradata_${solrname}.xml $DATADIR/virgo4_libradata_${solrname}.xml.bak  2> /dev/null
+            mv $DATADIR/virgo4_${corename}_${solrname}.xml $DATADIR/virgo4_${corename}_${solrname}.xml.bak  2> /dev/null
 
             Verbose "Transforming the libra/solr record dump into a new virgo/solr add document"
 
-            java  -jar $BASEDIR/saxon9.jar  $DATADIR/libradata_${solrname}_data.xml  $SCRIPTDIR/$transform |
-                 sed -e 's/\\n/\&#10;/g' -e 's/<?xml version="1.0" encoding="UTF-8"?>//'  > $DATADIR/virgo4_libradata_${solrname}.xml 2>&1 | vlog
+            java ${JAVA_MEM} -jar $BASEDIR/saxon9.jar  $DATADIR/${corename}_${solrname}_data.xml  $SCRIPTDIR/$transform |
+                 sed -e 's/\\n/\&#10;/g' -e 's/<?xml version="1.0" encoding="UTF-8"?>//'  > $DATADIR/virgo4_${corename}_${solrname}.xml 2>&1 | vlog
 
             Verbose "Now figure out if any records need to be deleted"
-            cat $DATADIR/virgo4_libradata_${solrname}.xml | egrep '"id"' | sed -e 's/[^>]*>//' -e 's/<.*$//' | sort > $DATADIR/cur_ids_being_added.ids
-            curl -s "$solrurl/select?fl=id&q=data_source_f%3Adataverse&rows=10000" | egrep '"id":' | sed -e 's/.*":"//' -e 's/".*$//' | sort  > $DATADIR/cur_ids_in_solr.ids
+            cat $DATADIR/virgo4_${corename}_${solrname}.xml | egrep '"id"' | sed -e 's/[^>]*>//' -e 's/<.*$//' | sort > $DATADIR/cur_ids_being_added.ids
+            curl -s "$solrurl/select?fl=id&q=data_source_f%3A${corename}&rows=10000" | egrep '"id":' | sed -e 's/.*":"//' -e 's/".*$//' | sort  > $DATADIR/cur_ids_in_solr.ids
             diff $DATADIR/cur_ids_in_solr.ids $DATADIR/cur_ids_being_added.ids | egrep '<' | sed -e 's/< //' > $DATADIR/records_to_delete_${corename}_${solrname}.ids
 
             if [ -s $DATADIR/records_to_delete_${corename}_${solrname}.ids ] ; then
@@ -129,9 +142,9 @@ do
 
             Verbose "Upload transformed records to ${solrname} S3 bucket"
             if [ "$test" == "-t" ]; then
-                Echo "aws s3 cp $DATADIR/virgo4_libradata_${solrname}.xml ${s3bucket}/virgo4_libradata_${solrname}.xml"
+                Echo "aws s3 cp $DATADIR/virgo4_${corename}_${solrname}.xml ${s3bucket}/virgo4_${corename}_${solrname}.xml"
             else
-                aws s3 cp $DATADIR/virgo4_libradata_${solrname}.xml ${s3bucket}/virgo4_libradata_${solrname}.xml
+                aws s3 cp $DATADIR/virgo4_${corename}_${solrname}.xml ${s3bucket}/virgo4_${corename}_${solrname}.xml
             fi
 
         fi

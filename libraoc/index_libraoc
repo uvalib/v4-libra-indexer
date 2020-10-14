@@ -62,15 +62,20 @@ do
     s3bucket=`echo $line| cut -d '|' -f4 | sed -e "s/2020/$year/"`
     s3deletebucket=`echo $line| cut -d '|' -f5 | sed -e "s/2020/$year/"`
     solrurl=`echo $line | cut -d '|' -f6`
+    url=`cat $SCRIPTDIR/$libraurlfile`
 
     if [[ "$index" =~ $solrname ]]; then
-        hostname=`cat $SCRIPTDIR/$libraurlfile | sed -e 's#^[^:]*://##' -e 's#[:/].*$##'`
-        ip=`$BASEDIR/resolve_private.bash $hostname`
-        LIBRAURL=`cat $SCRIPTDIR/$libraurlfile | sed -e "s#${hostname}#${ip}#"`
+        if [[ $url =~ "private" ]]; then
+            hostname=`echo $url | sed -e 's#^[^:]*://##' -e 's#[:/].*$##'`
+            ip=`$BASEDIR/resolve_private.bash $hostname`
+            LIBRAURL=`cat $SCRIPTDIR/$libraurlfile | sed -e "s#${hostname}#${ip}#"`
+        else
+            LIBRAURL=$url
+        fi
         Verbose "Resolved LibraURL to: $LIBRAURL"
 
         date=`$SCRIPTDIR/getlastupdatedate $LIBRAURL`
-        Verbose "Last update date for Libra is: $date"
+        Verbose "Date of newest item in ${corename} is: $date"
 
         lastupdate=`cat $DATADIR/lastupdate_$solrname`
         lastupdateNoT=`cat $DATADIR/lastupdate_$solrname | sed -e 's/T/ /'`
@@ -81,10 +86,10 @@ do
             mv $DATADIR/${corename}_${solrname}_data.xml $DATADIR/${corename}_${solrname}_data.xml.bak 2> /dev/null
             Verbose "Querying the ${corename} solr for all records matching the query in the query file"
             Verbose "Using URL of: $LIBRAURL?q=$query$parms"
-            curl -s "$LIBRAURL?q=$query$parms" | xmllint --format - >  $DATADIR/${corename}_${solrname}_data.xml
+            curl -s "$LIBRAURL?q=$query$parms" | xmllint --format - | egrep -v "QTime" >  $DATADIR/${corename}_${solrname}_data.xml
             downloaded=1
 
-            cmp $DATADIR/${corename}_${solrname}_data.xml $DATADIR/${corename}_${solrname}_data.xml.bak 
+            cmp $DATADIR/${corename}_${solrname}_data.xml $DATADIR/${corename}_${solrname}_data.xml.bak
             cmpresult=$?
 
 #        else
