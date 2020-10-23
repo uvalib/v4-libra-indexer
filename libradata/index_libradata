@@ -30,22 +30,22 @@ if [ "$force" == "-f" ] ; then
     Verbose "Forcing index rebuild with -f flag"
 fi
 
-if [ "$AWS_ACCESS_KEY_ID" == "" ] ; then
-    Echo "environment variable AWS_ACCESS_KEY_ID must be defined"
-    exit 1
-fi
-if [ "$AWS_SECRET_ACCESS_KEY" == "" ] ; then
-    Echo "environment variable AWS_SECRET_ACCESS_KEY must be defined"
-    exit 1
-fi
+#if [ "$AWS_ACCESS_KEY_ID" == "" ] ; then
+#    Echo "environment variable AWS_ACCESS_KEY_ID must be defined"
+#    exit 1
+#fi
+#if [ "$AWS_SECRET_ACCESS_KEY" == "" ] ; then
+#    Echo "environment variable AWS_SECRET_ACCESS_KEY must be defined"
+#    exit 1
+#fi
 #if [ "$AWS_DEFAULT_REGION" == "" ] ; then
 #    Echo "environment variable AWS_DEFAULT_REGION must be defined"
 #    exit 1
 #fi
-if [ "$AWS_REGION" == "" ] ; then
-    Echo "environment variable AWS_REGION must be defined"
-    exit 1
-fi
+#if [ "$AWS_REGION" == "" ] ; then
+#    Echo "environment variable AWS_REGION must be defined"
+#    exit 1
+#fi
 
 query=`cat $SCRIPTDIR/query.txt | sed -e 's/["]/%22/g' -e 's/[*]/%2A/g' -e 's/[[]/%5B/g' -e 's/[]]/%5D/g' -e 's/ /+/g'`
 parms='&rows=10000&wt=xml&fl=*'

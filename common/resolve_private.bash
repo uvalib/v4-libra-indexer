@@ -48,15 +48,15 @@ HOSTNAME=$1
 shift
 
 # check our environment requirements
-if [ -z "AWS_ACCESS_KEY_ID" ]; then
-   error_and_exit "AWS_ACCESS_KEY_ID is not defined in the environment"
-fi
-if [ -z "AWS_SECRET_KEY" ]; then
-   error_and_exit "AWS_SECRET_KEY is not defined in the environment"
-fi
-if [ -z "AWS_DEFAULT_REGION" ]; then
-   error_and_exit "AWS_DEFAULT_REGION is not defined in the environment"
-fi
+#if [ -z "$AWS_ACCESS_KEY_ID" ]; then
+#   error_and_exit "AWS_ACCESS_KEY_ID is not defined in the environment"
+#fi
+#if [ -z "$AWS_SECRET_KEY" ]; then
+#   error_and_exit "AWS_SECRET_KEY is not defined in the environment"
+#fi
+#if [ -z "$AWS_DEFAULT_REGION" ]; then
+#   error_and_exit "AWS_DEFAULT_REGION is not defined in the environment"
+#fi
 
 # ensure we have the jq tool available
 JQ_TOOL=jq
