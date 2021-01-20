@@ -81,20 +81,15 @@ do
         lastupdateNoT=`cat $DATADIR/lastupdate_$solrname | sed -e 's/T/ /'`
         datequeryedited=`date -u -r $SCRIPTDIR/query.txt  "+%Y-%m-%dT%T.0Z"`
 
-#        if [[ "$date" > "$lastupdate" || "$datequeryedited" > "$lastupdate" || "$force" == "-f" ]]; then
-            Verbose "Backing up the ${corename} solr record dump from the last update"
-            mv $DATADIR/${corename}_${solrname}_data.xml $DATADIR/${corename}_${solrname}_data.xml.bak 2> /dev/null
-            Verbose "Querying the ${corename} solr for all records matching the query in the query file"
-            Verbose "Using URL of: $LIBRAURL?q=$query$parms"
-            curl -s "$LIBRAURL?q=$query$parms" | xmllint --format - | egrep -v "QTime" >  $DATADIR/${corename}_${solrname}_data.xml
-            downloaded=1
+        Verbose "Backing up the ${corename} solr record dump from the last update"
+        mv $DATADIR/${corename}_${solrname}_data.xml $DATADIR/${corename}_${solrname}_data.xml.bak 2> /dev/null
+        Verbose "Querying the ${corename} solr for all records matching the query in the query file"
+        Verbose "Using URL of: $LIBRAURL?q=$query$parms"
+        curl -s "$LIBRAURL?q=$query$parms" | xmllint --format - | egrep -v "QTime" >  $DATADIR/${corename}_${solrname}_data.xml
+        downloaded=1
 
-            cmp $DATADIR/${corename}_${solrname}_data.xml $DATADIR/${corename}_${solrname}_data.xml.bak
-            cmpresult=$?
-
-#        else
-#            Verbose "No new records detected, no retrieval required"
-#        fi
+        cmp $DATADIR/${corename}_${solrname}_data.xml $DATADIR/${corename}_${solrname}_data.xml.bak
+        cmpresult=$?
 
         datescriptedited=`date -u -r $SCRIPTDIR/$transform  "+%Y-%m-%dT%T.0Z"`
         datelasttransform=`date -u -r $DATADIR/virgo4_${corename}_${solrname}.xml  "+%Y-%m-%dT%T.0Z"`
@@ -114,6 +109,7 @@ do
             fi
         fi
 
+        newdata=0
         if [[ "$cmpresult" != "0" || "$datescriptedited" > "$datelasttransform" || "$force" == "-f" ]]
         then
             Verbose "Backing up the virgo/solr add document from the last update for $solrname index"
@@ -123,32 +119,32 @@ do
 
             java ${JAVA_MEM} -jar $BASEDIR/saxon9.jar  $DATADIR/${corename}_${solrname}_data.xml  $SCRIPTDIR/$transform |
                  sed -e 's/\\n/\&#10;/g' -e 's/<?xml version="1.0" encoding="UTF-8"?>//'  > $DATADIR/virgo4_${corename}_${solrname}.xml 2>&1 | vlog
+            newdata=1
+        fi
+        Verbose "Now figure out if any records need to be deleted"
+        cat $DATADIR/virgo4_${corename}_${solrname}.xml | egrep '"id"' | sed -e 's/[^>]*>//' -e 's/<.*$//' | sort > $DATADIR/cur_ids_being_added.ids
+        curl -s "$solrurl/select?fl=id&q=data_source_f%3A${corename}&rows=10000" | egrep '"id":' | sed -e 's/.*":"//' -e 's/".*$//' | sort  > $DATADIR/cur_ids_in_solr.ids
+        Verbose "Newly transformed file contains `cat $DATADIR/cur_ids_being_added.ids | wc -l` record for $corename"
+        Verbose "Current ${solrname} contains `cat $DATADIR/cur_ids_in_solr.ids | wc -l` record for $corename"
+        diff $DATADIR/cur_ids_in_solr.ids $DATADIR/cur_ids_being_added.ids | egrep '<' | sed -e 's/< //' > $DATADIR/records_to_delete_${corename}_${solrname}.ids
 
-            Verbose "Now figure out if any records need to be deleted"
-            cat $DATADIR/virgo4_${corename}_${solrname}.xml | egrep '"id"' | sed -e 's/[^>]*>//' -e 's/<.*$//' | sort > $DATADIR/cur_ids_being_added.ids
-            curl -s "$solrurl/select?fl=id&q=data_source_f%3A${corename}&rows=10000" | egrep '"id":' | sed -e 's/.*":"//' -e 's/".*$//' | sort  > $DATADIR/cur_ids_in_solr.ids
-            Verbose "Newly transformed file contains `cat $DATADIR/cur_ids_being_added.ids | wc -l` record for $corename"
-            Verbose "Current ${solrname} contains `cat $DATADIR/cur_ids_in_solr.ids | wc -l` record for $corename"
-            diff $DATADIR/cur_ids_in_solr.ids $DATADIR/cur_ids_being_added.ids | egrep '<' | sed -e 's/< //' > $DATADIR/records_to_delete_${corename}_${solrname}.ids
-
-            if [ -s $DATADIR/records_to_delete_${corename}_${solrname}.ids ] ; then
-                Verbose "Some records in virgo solr that are not in the new dump of all records"
-                if [ "$test" == "-t" ]; then
-                    Echo "aws s3 cp $DATADIR/records_to_delete_${corename}_${solrname}.ids ${s3deletebucket}/records_to_delete_${corename}_${solrname}.ids"
-                else
-                    aws s3 cp $DATADIR/records_to_delete_${corename}_${solrname}.ids ${s3deletebucket}/records_to_delete_${corename}_${solrname}.ids
-                fi
+        if [ -s $DATADIR/records_to_delete_${corename}_${solrname}.ids ] ; then
+            Verbose "Some records in virgo solr that are not in the new dump of all records"
+            if [ "$test" == "-t" ]; then
+                Echo "aws s3 cp $DATADIR/records_to_delete_${corename}_${solrname}.ids ${s3deletebucket}/records_to_delete_${corename}_${solrname}.ids"
             else
-               Verbose "    No records need to be deleted"
+                aws s3 cp $DATADIR/records_to_delete_${corename}_${solrname}.ids ${s3deletebucket}/records_to_delete_${corename}_${solrname}.ids
             fi
-
+        else
+           Verbose "    No records need to be deleted"
+        fi
+        if [[ "$newdata" == "1" ]]; then
             Verbose "Upload transformed records to ${solrname} S3 bucket"
             if [ "$test" == "-t" ]; then
                 Echo "aws s3 cp $DATADIR/virgo4_${corename}_${solrname}.xml ${s3bucket}/virgo4_${corename}_${solrname}.xml"
             else
                 aws s3 cp $DATADIR/virgo4_${corename}_${solrname}.xml ${s3bucket}/virgo4_${corename}_${solrname}.xml
             fi
-
         fi
     fi
 done
