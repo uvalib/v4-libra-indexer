@@ -124,10 +124,17 @@ do
         Verbose "Now figure out if any records need to be deleted"
         cat $DATADIR/virgo4_${corename}_${solrname}.xml | egrep '"id"' | sed -e 's/[^>]*>//' -e 's/<.*$//' | sort > $DATADIR/cur_ids_being_added.ids
         curl -s "$solrurl/select?fl=id&q=data_source_f%3A${corename}&rows=10000" | egrep '"id":' | sed -e 's/.*":"//' -e 's/".*$//' | sort  > $DATADIR/cur_ids_in_solr.ids
-        Verbose "Newly transformed file contains `cat $DATADIR/cur_ids_being_added.ids | wc -l` records for $corename"
-        Verbose "Current ${solrname} contains `cat $DATADIR/cur_ids_in_solr.ids | wc -l` records for $corename"
-        diff $DATADIR/cur_ids_in_solr.ids $DATADIR/cur_ids_being_added.ids | egrep '<' | cut -c 3- > $DATADIR/records_to_delete_${corename}_${solrname}.ids
-        Verbose "Diff output contains `cat $DATADIR/records_to_delete_${corename}_${solrname}.ids | wc -l` records for $corename"
+        num_added=`cat $DATADIR/cur_ids_being_added.ids | wc -l`
+        num_in_solr=`cat $DATADIR/cur_ids_in_solr.ids | wc -l`
+        Verbose "Newly transformed file contains $num_added records for $corename"
+        Verbose "Current ${solrname} contains $num_in_solr records for $corename"
+        diff --normal $DATADIR/cur_ids_in_solr.ids $DATADIR/cur_ids_being_added.ids | egrep '<' | cut -c 3- > $DATADIR/records_to_delete_${corename}_${solrname}.ids
+
+        num_to_delete=`cat $DATADIR/records_to_delete_${corename}_${solrname}.ids | wc -l`
+        Verbose "Diff output contains $num_to_delete records for $corename"
+        if [[ "$num_added" != "$num_in_solr" && "$num_to_delete" == "0" ]] ; then
+            diff --normal $DATADIR/cur_ids_in_solr.ids $DATADIR/cur_ids_being_added.ids | vlog 
+        fi
 
         if [ -s $DATADIR/records_to_delete_${corename}_${solrname}.ids ] ; then
             Verbose "Some records in virgo solr that are not in the new dump of all records"
