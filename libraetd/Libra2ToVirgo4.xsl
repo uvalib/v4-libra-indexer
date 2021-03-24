@@ -187,6 +187,7 @@
                 <xsl:if test="arr[@name='description_tesim']/str != '' and arr[@name='description_tesim']/str != 'Enter your description here'">
                     <xsl:variable name="summary"><xsl:value-of select="replace(arr[@name='description_tesim']/str, '[ ]*&#10;+[ ]*', ' \\n ')"/></xsl:variable>
                     <field name="subject_summary_tsearch_stored"><xsl:value-of select="$summary" /></field>
+                    <field name="abstract_tsearch_stored"><xsl:value-of select="$summary" /></field>
                 </xsl:if>
                 <xsl:if test="arr[@name='notes_tesim']/str != '' and arr[@name='notes_tesim']/str != 'Enter your description here'">
                     <xsl:variable name="notes"><xsl:value-of select="replace(arr[@name='notes_tesim']/str, '[ ]*&#10;+[ ]*', ' \\n ')"/></xsl:variable>
