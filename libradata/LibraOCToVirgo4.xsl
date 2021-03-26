@@ -218,7 +218,7 @@
                 </xsl:for-each>
 
                 <xsl:for-each select="arr[@name='notes_tesim']/str">
-                    <field name="notes_tsearch_stored"><xsl:value-of select="normalize-space(string(.))"/></field>
+                    <field name="note_tsearch_stored"><xsl:value-of select="normalize-space(string(.))"/></field>
                 </xsl:for-each>
                 
                 <xsl:choose>

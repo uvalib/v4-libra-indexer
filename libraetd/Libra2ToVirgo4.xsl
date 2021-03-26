@@ -191,7 +191,7 @@
                 </xsl:if>
                 <xsl:if test="arr[@name='notes_tesim']/str != '' and arr[@name='notes_tesim']/str != 'Enter your description here'">
                     <xsl:variable name="notes"><xsl:value-of select="replace(arr[@name='notes_tesim']/str, '[ ]*&#10;+[ ]*', ' \\n ')"/></xsl:variable>
-                    <field name="notes_tsearch_stored"><xsl:value-of select="$notes" /></field>
+                    <field name="note_tsearch_stored"><xsl:value-of select="$notes" /></field>
                  </xsl:if>
                 <field name="date_indexed_f_stored"><xsl:call-template name="formatDateTime">
                     <xsl:with-param name="dateTime"><xsl:value-of select='current-dateTime()'/></xsl:with-param>

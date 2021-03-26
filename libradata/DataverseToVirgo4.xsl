@@ -251,7 +251,7 @@
                 </xsl:if>
 
                 <xsl:if test="str[@name='notesText'] != ''">
-                    <field name="notes_tsearch_stored"><xsl:value-of select="str[@name='notesText']"/></field>
+                    <field name="note_tsearch_stored"><xsl:value-of select="str[@name='notesText']"/></field>
                 </xsl:if>
 
                 <xsl:choose>
