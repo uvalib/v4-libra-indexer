@@ -263,7 +263,14 @@
                     </field>
                 </xsl:for-each> -->
                 <xsl:if test="not(arr[@name='rights_url_ssm'])">
-                    <field name="rs_uri_a">http://rightsstatements.org/vocab/InC/1.0/</field>
+                    <xsl:choose>
+                        <xsl:when test="contains(arr[@name='rights_display_ssm']/str, 'NoC-US')" >
+                            <field name="rs_uri_a">http://rightsstatements.org/vocab/NoC/1.0/</field>
+                        </xsl:when>
+                        <xsl:otherwise>
+                            <field name="rs_uri_a">http://rightsstatements.org/vocab/InC/1.0/</field>
+                        </xsl:otherwise>
+                    </xsl:choose>
                 </xsl:if>
                 <xsl:for-each select="distinct-values(arr[@name='rights_url_ssm']/str)">
                     <xsl:variable name="cc_license_path" select="substring-after(., 'creativecommons.org/')" />

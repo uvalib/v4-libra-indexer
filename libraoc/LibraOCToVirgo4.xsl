@@ -354,8 +354,15 @@
                 <xsl:for-each select="distinct-values(arr[@name='rights_display_ssm']/str)">
                     <field name="rights_tsearchf_stored"><xsl:value-of select="."/></field>
                 </xsl:for-each>
-                <xsl:if test="not(arr[@name='rights_url_ssm']/str)">
-                    <field name="rs_uri_a">http://rightsstatements.org/vocab/InC/1.0/</field>
+                <xsl:if test="not(arr[@name='rights_url_ssm'])">
+                    <xsl:choose>
+                        <xsl:when test="contains(arr[@name='rights_display_ssm']/str, 'NoC-US')" >
+                            <field name="rs_uri_a">http://rightsstatements.org/vocab/NoC/1.0/</field>
+                        </xsl:when>
+                        <xsl:otherwise>
+                            <field name="rs_uri_a">http://rightsstatements.org/vocab/InC/1.0/</field>
+                        </xsl:otherwise>
+                    </xsl:choose>
                 </xsl:if>
                 <xsl:for-each select="distinct-values(arr[@name='rights_url_ssm']/str)">
                     <xsl:variable name="uri" select="normalize-space(.)" />

@@ -51,7 +51,7 @@ downloaded=0
 
 mkdir -p $DATADIR
 
-diff --normal $SCRIPTDIR/cores_to_process $SCRIPTDIR/cores_to_process 2>@1 > /dev/null
+diff --normal $SCRIPTDIR/cores_to_process $SCRIPTDIR/cores_to_process 2>&1 > /dev/null
 if [[  $? != 0 ]] ; then
     Verbose "Running Busybox, diff is different"
     diff_flag=
