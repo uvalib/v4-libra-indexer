@@ -265,7 +265,7 @@
                 <xsl:if test="not(arr[@name='rights_url_ssm'])">
                     <xsl:choose>
                         <xsl:when test="contains(arr[@name='rights_display_ssm']/str, 'NoC-US')" >
-                            <field name="rs_uri_a">http://rightsstatements.org/vocab/NoC/1.0/</field>
+                            <field name="rs_uri_a">http://rightsstatements.org/vocab/NoC-US/1.0/</field>
                         </xsl:when>
                         <xsl:otherwise>
                             <field name="rs_uri_a">http://rightsstatements.org/vocab/InC/1.0/</field>
