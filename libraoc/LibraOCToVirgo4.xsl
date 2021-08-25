@@ -84,7 +84,7 @@
                         </xsl:when>
                         <xsl:when test="date[@name='embargo_release_date_dtsi']">
                             <xsl:text>VISIBLE</xsl:text>
-                        </xsl:when><xsl:otherwise>
+                        </xsl:when>
                         <xsl:otherwise>
                             <xsl:text>HIDDEN</xsl:text>
                         </xsl:otherwise>
