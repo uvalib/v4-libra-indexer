@@ -1,0 +1,188 @@
+#!/bin/bash
+
+SCRIPTDIR=$( (cd -P $(dirname $0) && pwd) )
+corename=$( basename $SCRIPTDIR )
+DATADIR=${SCRIPTDIR}/data
+BASEDIR=$( dirname $SCRIPTDIR )/common
+JAVA_MEM="-Xms512M -Xmx512M"
+
+# load the shared bash functions log, vlog and Verbose
+. $BASEDIR/outputfuncs.bash
+
+verbose=
+force=
+test=
+index=staging:production
+while getopts :vfti: opt
+ do
+      case $opt in
+          v) verbose=-v;;
+          t) test=-t;;
+          f) force=-f;;
+          i) index=$OPTARG
+      esac
+done
+shift $((OPTIND-1))
+
+if [ "$force" == "-f" ] ; then
+    Verbose "Forcing index rebuild with -f flag"
+fi
+
+#if [ "$AWS_ACCESS_KEY_ID" == "" ] ; then
+#    Echo "environment variable AWS_ACCESS_KEY_ID must be defined"
+#    exit 1
+#fi
+#if [ "$AWS_SECRET_ACCESS_KEY" == "" ] ; then
+#    Echo "environment variable AWS_SECRET_ACCESS_KEY must be defined"
+#    exit 1
+#fi
+#if [ "$AWS_DEFAULT_REGION" == "" ] ; then
+#    Echo "environment variable AWS_DEFAULT_REGION must be defined"
+#    exit 1
+#fi
+#if [ "$AWS_REGION" == "" ] ; then
+#    Echo "environment variable AWS_REGION must be defined"
+#    exit 1
+#fi
+
+query=`cat $SCRIPTDIR/query.txt | sed -e 's/["]/%22/g' -e 's/[*]/%2A/g' -e 's/[[]/%5B/g' -e 's/[]]/%5D/g' -e 's/ /+/g'`
+parmsraw='&rows=10000&wt=xml&fl=*,read_access_group_ssim:[value v=""],read_access_virtual_group_ssim:[value v=""],read_access_ip_group_ssim:[value v=""]'
+parms=`echo $parmsraw |  sed -e 's/["]/%22/g' -e 's/[*]/%2A/g' -e 's/[[]/%5B/g' -e 's/[]]/%5D/g' -e 's/ /+/g'`
+downloaded=0
+
+mkdir -p $DATADIR
+
+diff --normal $SCRIPTDIR/cores_to_process $SCRIPTDIR/cores_to_process 2>&1 > /dev/null
+if [[  $? != 0 ]] ; then
+    Verbose "Running Busybox, diff is different"
+    diff_flag=
+else
+    Verbose "Not running Busybox, all is well"
+    diff_flag=-u
+fi
+
+for line in `cat $SCRIPTDIR/cores_to_process`
+do
+    year=`date "+%Y"`
+    solrname=`echo $line| cut -d '|' -f1`
+    transform=`echo $line| cut -d '|' -f2`
+    avalonsolrurlfile=`echo $line| cut -d '|' -f3`
+    avalonfedoraurlfile=`echo $line| cut -d '|' -f4`
+    s3bucket=`echo $line| cut -d '|' -f5 | sed -e "s/2020/$year/"`
+    s3deletebucket=`echo $line| cut -d '|' -f6 | sed -e "s/2020/$year/"`
+    solrurl=`echo $line | cut -d '|' -f7`
+    avalonsolrurl=`cat $SCRIPTDIR/$avalonsolrurlfile`
+    avalonfedoraurl=`cat $SCRIPTDIR/$avalonfedoraurlfile`
+
+    if [[ "$index" =~ $solrname ]]; then
+        if [[ "$avalonsolrurl" =~ "private" ]]; then
+            hostname=`echo "$avalonsolrurl" | sed -e 's#^[^:]*://##' -e 's#[:/].*$##'`
+            ip=`$BASEDIR/resolve_private.bash $hostname`
+            avalonsolrurl=`echo $avalonsolrurl | sed -e "s#${hostname}#${ip}#"`
+        fi
+        Verbose "Resolved AvalonSolrURL to: $avalonsolrurl"
+
+        if [[ $avalonfedoraurl =~ "private" ]]; then
+            hostname=`echo $avalonfedoraurl | sed -e 's#^[^:]*://##' -e 's#[:/].*$##'`
+            ip=`$BASEDIR/resolve_private.bash $hostname`
+            avalonfedoraurl=`echo $avalonfedoraurl | sed -e "s#${hostname}#${ip}#"`
+        fi
+        Verbose "Resolved AvalonFedoraURL to: $avalonfedoraurl"
+
+        date=`$SCRIPTDIR/getlastupdatedate $avalonsolrurl`
+        Verbose "Date of newest item in ${corename} is: $date"
+
+        lastupdate=`cat $DATADIR/lastupdate_$solrname`
+        lastupdateNoT=`cat $DATADIR/lastupdate_$solrname | sed -e 's/T/ /'`
+        datequeryedited=`date -u -r $SCRIPTDIR/query.txt  "+%Y-%m-%dT%T.0Z"`
+
+        Verbose "Backing up the ${corename} solr record dump from the last update"
+        mv $DATADIR/${corename}_${solrname}_data.xml $DATADIR/${corename}_${solrname}_data.xml.bak 2> /dev/null
+        Verbose "Querying the ${corename} solr for all records matching the query in the query file"
+        Verbose "Using URL of: $avalonsolrurl?q=$query$parms"
+        curl -s "$avalonsolrurl?q=$query$parms" | xmllint --format - | egrep -v "QTime" >  $DATADIR/${corename}_${solrname}_data.xml
+        downloaded=1
+
+        cmp $DATADIR/${corename}_${solrname}_data.xml $DATADIR/${corename}_${solrname}_data.xml.bak
+        cmpresult=$?
+
+        datescriptedited=`date -u -r $SCRIPTDIR/$transform  "+%Y-%m-%dT%T.0Z"`
+        datelasttransform=`date -u -r $DATADIR/virgo4_${corename}_${solrname}.xml  "+%Y-%m-%dT%T.0Z"`
+        datelastdownload=`cat $DATADIR/lastupdate_${solrname}`
+        Verbose "Storing last download date"
+        echo `date -u -r "$DATADIR/${corename}_${solrname}_data.xml" "+%Y-%m-%dT%T.0Z"` > $DATADIR/lastupdate_${solrname}
+
+        Verbose "Now retrieve the MODS datastreams from the fedora instance under the avalon system."
+        cat $DATADIR/${corename}_${solrname}_data.xml | egrep '"id">' | sed -e 's/.*">\([^<]*\)<.*/\1/' > ${DATADIR}/${corename}_${solrname}_ids.txt
+        mkdir -p $DATADIR/mods
+        for pid in `cat ${DATADIR}/${corename}_${solrname}_ids.txt`
+        do 
+            base="$avalonfedoraurl"
+            url="${base}/"`echo $pid | sed -e 's#\(\(..\)\(..\)\(..\)\(..\).*\)#\2/\3/\4/\5/\1/descMetadata#'` 
+            echo $url
+            curl -s "$url" > $DATADIR/mods/${pid}_mods.xml
+        done 
+
+        if [[ "$force" == "-f" ]]; then
+            Verbose "Forcing $solrname index rebuild with -f flag"
+        else
+            Verbose "Checking whether $corename needs reindexing in $solrname index"
+            if [[ "$cmpresult" != "0" ]] ; then
+                Verbose "Records downloaded from $corename different from last time they were downloaded"
+            fi
+            if [[ "$datescriptedited" > "$datelasttransform" ]] ; then
+                Verbose "AvalonToVirgo transform for the $solrname index is newer than last update: $datescriptedited > $datelasttransform "
+            fi
+        fi
+
+        newdata=0
+        if [[ "$cmpresult" != "0" || "$datescriptedited" > "$datelasttransform" || "$force" == "-f" ]]
+        then
+            Verbose "Backing up the virgo/solr add document from the last update for $solrname index"
+            mv $DATADIR/virgo4_${corename}_${solrname}.xml $DATADIR/virgo4_${corename}_${solrname}.xml.bak  2> /dev/null
+
+            Verbose "Transforming the avalon/solr record dump into a new virgo/solr add document"
+
+            java ${JAVA_MEM} -jar $BASEDIR/saxon9.jar  $DATADIR/${corename}_${solrname}_data.xml  $SCRIPTDIR/$transform |
+                 sed -e 's/\\n/\&#10;/g' -e 's/<?xml version="1.0" encoding="UTF-8"?>//'  > $DATADIR/virgo4_${corename}_${solrname}.xml 2>&1 | vlog
+            newdata=1
+        fi
+exit
+        Verbose "Now figure out if any records need to be deleted"
+
+        cat $DATADIR/virgo4_${corename}_${solrname}.xml | egrep '"id"' | sed -e 's/[^>]*>//' -e 's/<.*$//' | sort > $DATADIR/cur_ids_being_added.ids
+        curl -s "$solrurl/select?fl=id&q=data_source_f%3A${corename}&rows=10000" | egrep '"id":' | sed -e 's/.*":"//' -e 's/".*$//' | sort  > $DATADIR/cur_ids_in_solr.ids
+        num_added=`cat $DATADIR/cur_ids_being_added.ids | wc -l`
+        num_in_solr=`cat $DATADIR/cur_ids_in_solr.ids | wc -l`
+        Verbose "Newly transformed file contains $num_added records for $corename"
+        Verbose "Current ${solrname} contains $num_in_solr records for $corename"
+        diff $diff_flag $DATADIR/cur_ids_in_solr.ids $DATADIR/cur_ids_being_added.ids | egrep '^-' | egrep -v "^---" | cut -c 2- > $DATADIR/records_to_delete_${corename}_${solrname}.ids
+
+        num_to_delete=`cat $DATADIR/records_to_delete_${corename}_${solrname}.ids | wc -l`
+        Verbose "Diff output contains $num_to_delete records for $corename"
+        if [[ "$num_added" != "$num_in_solr" && "$num_to_delete" == "0" ]] ; then
+            diff $diff_flag $DATADIR/cur_ids_in_solr.ids $DATADIR/cur_ids_being_added.ids | vlog 
+        fi
+
+        if [ -s $DATADIR/records_to_delete_${corename}_${solrname}.ids ] ; then
+            Verbose "Some records in virgo solr that are not in the new dump of all records"
+            if [ "$test" == "-t" ]; then
+                Echo "aws s3 cp $DATADIR/records_to_delete_${corename}_${solrname}.ids ${s3deletebucket}/records_to_delete_${corename}_${solrname}.ids"
+            else
+                aws s3 cp $DATADIR/records_to_delete_${corename}_${solrname}.ids ${s3deletebucket}/records_to_delete_${corename}_${solrname}.ids
+            fi
+        else
+           Verbose "    No records need to be deleted"
+        fi
+        if [[ "$newdata" == "1" ]]; then
+            Verbose "Upload transformed records to ${solrname} S3 bucket"
+            if [ "$test" == "-t" ]; then
+                Echo "aws s3 cp $DATADIR/virgo4_${corename}_${solrname}.xml ${s3bucket}/virgo4_${corename}_${solrname}.xml"
+            else
+                aws s3 cp $DATADIR/virgo4_${corename}_${solrname}.xml ${s3bucket}/virgo4_${corename}_${solrname}.xml
+            fi
+        fi
+    fi
+done
+    
+Verbose "Done updating core $corename"

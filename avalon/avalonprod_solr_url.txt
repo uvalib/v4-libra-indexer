@@ -1,0 +1,1 @@
+http://solr-02-production.private.production:8080/solr/avalon/select

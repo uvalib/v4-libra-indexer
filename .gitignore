@@ -1,6 +1,7 @@
 libraetd/data
 libraoc/data
 libradata/data
+avalon/data
 results
 env.*
 .idea
