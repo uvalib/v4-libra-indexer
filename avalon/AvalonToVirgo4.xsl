@@ -7,13 +7,19 @@
     <xsl:variable name="urlbase" select="string('https://avalon-dev.lib.virginia.edu/media_objects/')" />
     <xsl:variable name="lowercase" select="'abcdefghijklmnopqrstuvwxyz    '"/>
     <xsl:variable name="uppercase" select="'ABCDEFGHIJKLMNOPQRSTUVWXYZ,;-:.'"/>
-    <xsl:variable name="lang_lookup">
+    <xsl:variable name="blacklist_list" select="document('./CollectionShadow.xml')"/>
+    <xsl:variable name="blacklist_text">
+        <xsl:for-each select="$blacklist_list/collection-blacklist/val">
+            <xsl:value-of select="concat(' ', text(), ' ')" />
+        </xsl:for-each>
+    </xsl:variable>
+<!--    <xsl:variable name="lang_lookup">
         <lang>
             <abb>eng</abb>
             <name>English</name>
         </lang>
     </xsl:variable>
-    
+-->    
     <xsl:template match="text()" priority="-1"/>
     
     <xsl:template match="add">
@@ -95,11 +101,12 @@
               <!--             <field name="digital_collection_facet">Libra Repository</field>  -->
               <field name="location_f_stored">Internet Materials</field>
               <field name="shadowed_location_f_stored">
+                  <xsl:variable name="collection_id" select="arr[@name='isMemberOfCollection_ssim']/str/text()"/>
                   <xsl:choose>
                       <xsl:when test="bool[@name='hidden_bsi']/text() = 'true' ">
                           <xsl:text>HIDDEN</xsl:text>
                       </xsl:when>
-                      <xsl:when test="date[@name='embargo_release_date_dtsi']">
+                      <xsl:when test="contains($blacklist_text, concat(' ', $collection_id, ' '))" >
                           <xsl:text>HIDDEN</xsl:text>
                       </xsl:when>
                       <xsl:otherwise>
