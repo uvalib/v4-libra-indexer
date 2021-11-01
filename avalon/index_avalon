@@ -147,7 +147,7 @@ do
                  sed -e 's/\\n/\&#10;/g' -e 's/<?xml version="1.0" encoding="UTF-8"?>//'  > $DATADIR/virgo4_${corename}_${solrname}.xml 2>&1 | vlog
             newdata=1
         fi
-exit
+
         Verbose "Now figure out if any records need to be deleted"
 
         cat $DATADIR/virgo4_${corename}_${solrname}.xml | egrep '"id"' | sed -e 's/[^>]*>//' -e 's/<.*$//' | sort > $DATADIR/cur_ids_being_added.ids

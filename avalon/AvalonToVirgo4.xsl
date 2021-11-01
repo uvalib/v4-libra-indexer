@@ -4,12 +4,12 @@
     xmlns:mods="http://www.loc.gov/mods/v3"
     xmlns:rm="http://hydra-collab.stanford.edu/schemas/rightsMetadata/v1" exclude-result-prefixes="l mods rm">
     <xsl:output indent="yes" />
-    <xsl:variable name="urlbase" select="string('https://avalon-dev.lib.virginia.edu/media_objects/')" />
+    <xsl:variable name="urlbase" select="string('https://avalon-dev.lib.virginia.edu')" />
     <xsl:variable name="lowercase" select="'abcdefghijklmnopqrstuvwxyz    '"/>
     <xsl:variable name="uppercase" select="'ABCDEFGHIJKLMNOPQRSTUVWXYZ,;-:.'"/>
-    <xsl:variable name="blacklist_list" select="document('./CollectionShadow.xml')"/>
-    <xsl:variable name="blacklist_text">
-        <xsl:for-each select="$blacklist_list/collection-blacklist/val">
+    <xsl:variable name="shadowed_collection_list" select="document('./CollectionShadow.xml')"/>
+    <xsl:variable name="shadowed_collection_as_text">
+        <xsl:for-each select="$shadowed_collection_list/collection-blacklist/val">
             <xsl:value-of select="concat(' ', text(), ' ')" />
         </xsl:for-each>
     </xsl:variable>
@@ -22,7 +22,7 @@
 -->    
     <xsl:template match="text()" priority="-1"/>
     
-    <xsl:template match="add">
+    <xsl:template match="result">
         <add>
             <xsl:apply-templates select="*"/>
         </add>
@@ -38,7 +38,7 @@
                  
               <field name="id"><xsl:value-of select="$solrId" /></field>
               <field name="url_str_stored">
-                  <xsl:value-of select="concat($urlbase, $avalonId)"/>
+                  <xsl:value-of select="concat($urlbase, '/media_objects/', $avalonId)"/>
               </field>                  
               <!--             <field name="digital_collection_f_stored">Libra Repository</field>  -->
               
@@ -50,9 +50,6 @@
               <field name="circulating_f">true</field>
               <field name="source_f_stored">Avalon</field>
               <field name="source_f_stored">UVA Library Digital Repository</field>
-              <field name="record_date_stored">
-                  <xsl:value-of select="current-dateTime()"/>
-              </field>
               <field name="data_source_str_stored">avalon</field>
               <xsl:variable name="lang_name">
                   <xsl:choose>
@@ -74,16 +71,19 @@
               <xsl:if test="$audio and not($video)">
                   <field name="url_label_str_stored">Listen Online</field>
                   <field name="pool_f">music_recordings</field>
+                  <field name="format_f_stored">Sound Recording</field>
                   <field name="work_title3_key_ssort"><xsl:value-of select="translate(lower-case(concat($cleaned_title, '//MusicRecording')), ' ', '_')" /></field>
                   <field name="work_title2_key_ssort"><xsl:value-of select="translate(lower-case(concat($cleaned_title, '/', normalize-space($mods_doc/mods:mods/mods:name[1]/mods:namePart/text()), '/MusicRecording')), ' ', '_')" /></field>
               </xsl:if>
               <xsl:if test="$video">
                   <field name="url_label_str_stored">Watch Online</field>
                   <field name="pool_f">video</field>
+                  <field name="format_f_stored">Video</field>
                   <field name="work_title3_key_ssort"><xsl:value-of select="translate(lower-case(concat($cleaned_title, '//video')), ' ', '_')" /></field>
                   <field name="work_title2_key_ssort"><xsl:value-of select="translate(lower-case(concat($cleaned_title, '/', normalize-space($mods_doc/mods:mods/mods:name[1]/mods:namePart/text()), '/video')), ' ', '_')" /></field>
               </xsl:if>
-              <!-- flat_broke_with_children_women_in_the_age_of_welfare_reform//video -->
+               <field name="format_f_stored">Online</field>
+                <!-- flat_broke_with_children_women_in_the_age_of_welfare_reform//video -->
               <field name="uva_availability_f_stored">On shelf</field>
               <field name="anon_availability_f_stored">On shelf</field>
               <field name="uva_availability_f_stored">Online</field>
@@ -103,11 +103,14 @@
               <field name="shadowed_location_f_stored">
                   <xsl:variable name="collection_id" select="arr[@name='isMemberOfCollection_ssim']/str/text()"/>
                   <xsl:choose>
-                      <xsl:when test="bool[@name='hidden_bsi']/text() = 'true' ">
+                      <xsl:when test="contains($shadowed_collection_as_text, concat(' ', $collection_id, ' '))" >
                           <xsl:text>HIDDEN</xsl:text>
                       </xsl:when>
-                      <xsl:when test="contains($blacklist_text, concat(' ', $collection_id, ' '))" >
+                      <xsl:when test="str[@name='avalon_publisher_ssi']/text() = ''">
                           <xsl:text>HIDDEN</xsl:text>
+                      </xsl:when>
+                      <xsl:when test="bool[@name='hidden_bsi']/text() = 'true' ">
+                          <xsl:text>UNDISCOVERABLE</xsl:text>
                       </xsl:when>
                       <xsl:otherwise>
                           <xsl:text>VISIBLE</xsl:text>
@@ -134,7 +137,12 @@
                   <xsl:with-param name="dateTime"><xsl:value-of select='current-dateTime()'/></xsl:with-param>
                   </xsl:call-template>
               </field>
-
+              <xsl:if test="arr[@name='section_id_ssim']/str">
+                  <field name="thumbnail_url_stored"><xsl:value-of select="concat($urlbase, '/master_files/', arr[@name='section_id_ssim']/str[1]/text(), '/thumbnail')"/></field>
+                  <xsl:for-each select="arr[@name='section_id_ssim']/str">
+                      <field name="identifier_e_stored"><xsl:value-of select="./text()"/></field>
+                  </xsl:for-each>
+              </xsl:if>
               <field name="language_f_stored">
                   <xsl:value-of select="$lang_name"/>
               </field>
@@ -153,8 +161,10 @@
     <xsl:template name="runtime_fmt">
         <xsl:param name="millis"/>
         <xsl:variable name="seconds" select="floor($millis div 1000)"/>
-        <xsl:value-of select="format-number(floor($seconds div 3600), '00')" />
-        <xsl:value-of select="format-number(floor($seconds div 60) mod 60, ':00')"/>
+        <xsl:if test="floor($seconds div 3600) > 0 ">
+            <xsl:value-of select="format-number(floor($seconds div 3600), '00:')" />
+        </xsl:if>
+        <xsl:value-of select="format-number(floor($seconds div 60) mod 60, '00')"/>
         <xsl:value-of select="format-number($seconds mod 60, ':00')"/>
     </xsl:template>
     
