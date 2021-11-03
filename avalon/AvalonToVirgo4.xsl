@@ -9,7 +9,7 @@
     <xsl:variable name="uppercase" select="'ABCDEFGHIJKLMNOPQRSTUVWXYZ,;-:.'"/>
     <xsl:variable name="shadowed_collection_list" select="document('./CollectionShadow.xml')"/>
     <xsl:variable name="shadowed_collection_as_text">
-        <xsl:for-each select="$shadowed_collection_list/collection-blacklist/val">
+        <xsl:for-each select="$shadowed_collection_list/collection-ids/id">
             <xsl:value-of select="concat(' ', text(), ' ')" />
         </xsl:for-each>
     </xsl:variable>
