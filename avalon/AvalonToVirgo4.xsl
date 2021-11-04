@@ -106,14 +106,14 @@
                       <xsl:when test="contains($shadowed_collection_as_text, concat(' ', $collection_id, ' '))" >
                           <xsl:text>HIDDEN</xsl:text>
                       </xsl:when>
-                      <xsl:when test="str[@name='avalon_publisher_ssi']/text() = ''">
-                          <xsl:text>HIDDEN</xsl:text>
-                      </xsl:when>
                       <xsl:when test="bool[@name='hidden_bsi']/text() = 'true' ">
                           <xsl:text>UNDISCOVERABLE</xsl:text>
                       </xsl:when>
-                      <xsl:otherwise>
+                      <xsl:when test="str[@name='avalon_publisher_ssi']/text() != ''">
                           <xsl:text>VISIBLE</xsl:text>
+                      </xsl:when>
+                      <xsl:otherwise>
+                          <xsl:text>HIDDEN</xsl:text>
                       </xsl:otherwise>
                   </xsl:choose>
               </field>
