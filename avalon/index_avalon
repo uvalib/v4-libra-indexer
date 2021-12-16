@@ -77,14 +77,18 @@ do
     if [[ "$index" =~ $solrname ]]; then
         if [[ "$avalonsolrurl" =~ "private" ]]; then
             hostname=`echo "$avalonsolrurl" | sed -e 's#^[^:]*://##' -e 's#[:/].*$##'`
+            Verbose "AvalonSolrURL host: $hostname"
             ip=`$BASEDIR/resolve_private.bash $hostname`
+            Verbose "AvalonSolrURL ip: $ip"
             avalonsolrurl=`echo $avalonsolrurl | sed -e "s#${hostname}#${ip}#"`
         fi
         Verbose "Resolved AvalonSolrURL to: $avalonsolrurl"
 
         if [[ $avalonfedoraurl =~ "private" ]]; then
             hostname=`echo $avalonfedoraurl | sed -e 's#^[^:]*://##' -e 's#[:/].*$##'`
+            Verbose "Resolved AvalonFedoraURL host: $hostname"
             ip=`$BASEDIR/resolve_private.bash $hostname`
+            Verbose "Resolved AvalonFedoraURL ip: $ip"
             avalonfedoraurl=`echo $avalonfedoraurl | sed -e "s#${hostname}#${ip}#"`
         fi
         Verbose "Resolved AvalonFedoraURL to: $avalonfedoraurl"
