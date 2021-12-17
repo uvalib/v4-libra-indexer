@@ -1,5 +1,10 @@
 verbose=
 
+function urlfix ()
+{
+    sed -e 's/["]/%22/g' -e 's/[*]/%2A/g' -e 's/[[]/%5B/g' -e 's/[]]/%5D/g' -e 's/ /+/g'
+}
+
 #function to delete unwanted messages from solrmarc output
 # return 1 to say dont print this line
 # return 0 to say do print this line
