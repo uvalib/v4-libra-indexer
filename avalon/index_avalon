@@ -45,9 +45,9 @@ fi
 #    exit 1
 #fi
 
-query=`cat $SCRIPTDIR/query.txt | sed -e 's/["]/%22/g' -e 's/[*]/%2A/g' -e 's/[[]/%5B/g' -e 's/[]]/%5D/g' -e 's/ /+/g'`
+query=`cat $SCRIPTDIR/query.txt | urlfix `
 parmsraw='&rows=10000&wt=xml&fl=*,read_access_group_ssim:[value v=""],read_access_virtual_group_ssim:[value v=""],read_access_ip_group_ssim:[value v=""]'
-parms=`echo $parmsraw |  sed -e 's/["]/%22/g' -e 's/[*]/%2A/g' -e 's/[[]/%5B/g' -e 's/[]]/%5D/g' -e 's/ /+/g'`
+parms=`echo $parmsraw | urlfix `
 downloaded=0
 
 mkdir -p $DATADIR
@@ -96,7 +96,8 @@ do
         date=`$SCRIPTDIR/getlastupdatedate $avalonsolrurl`
         Verbose "Date of newest item in ${corename} is: $date"
 
-        lastupdate=`cat $DATADIR/lastupdate_$solrname`
+       # lastupdate=`cat $DATADIR/lastupdate_$solrname`
+        lastupdate=`cat $DATADIR/lastupdate_$solrname 2> /dev/null || echo '*'`
         lastupdateNoT=`cat $DATADIR/lastupdate_$solrname | sed -e 's/T/ /'`
         datequeryedited=`date -u -r $SCRIPTDIR/query.txt  "+%Y-%m-%dT%T.0Z"`
 
@@ -117,15 +118,35 @@ do
         echo `date -u -r "$DATADIR/${corename}_${solrname}_data.xml" "+%Y-%m-%dT%T.0Z"` > $DATADIR/lastupdate_${solrname}
 
         Verbose "Now retrieve the MODS datastreams from the fedora instance under the avalon system."
-        cat $DATADIR/${corename}_${solrname}_data.xml | egrep '"id">' | sed -e 's/.*">\([^<]*\)<.*/\1/' > ${DATADIR}/${corename}_${solrname}_ids.txt
+        if [[ "$force" == "-f" ]] ; then
+            timestampparm=""
+        else
+            timestampparm="&fq=timestamp:[${lastupdate} TO *]"
+            timestampparm=`echo $timestampparm | urlfix `
+        fi
+        curl -s "$avalonsolrurl?q=$query$parms$timestampparm" | xmllint --format - | egrep -v "QTime" | 
+               egrep '"id">' | sed -e 's/.*">\([^<]*\)<.*/\1/' > ${DATADIR}/${corename}_${solrname}_ids_to_fetch.txt
         mkdir -p $DATADIR/mods
-        for pid in `cat ${DATADIR}/${corename}_${solrname}_ids.txt`
+        let num_fetched=0
+        for pid in `cat ${DATADIR}/${corename}_${solrname}_ids_to_fetch.txt`
         do 
             base="$avalonfedoraurl"
             url="${base}/"`echo $pid | sed -e 's#\(\(..\)\(..\)\(..\)\(..\).*\)#\2/\3/\4/\5/\1/descMetadata#'` 
-            #echo $url
+            let num_fetched+=1
             curl -s "$url" > $DATADIR/mods/${pid}_mods.xml
         done 
+        cat $DATADIR/${corename}_${solrname}_data.xml | egrep '"id">' | sed -e 's/.*">\([^<]*\)<.*/\1/' > ${DATADIR}/${corename}_${solrname}_ids_to_check.txt
+        for pid in `cat ${DATADIR}/${corename}_${solrname}_ids_to_check.txt`
+        do 
+            if [[ ! -s $DATADIR/mods/${pid}_mods.xml ]] ; then 
+                base="$avalonfedoraurl"
+                url="${base}/"`echo $pid | sed -e 's#\(\(..\)\(..\)\(..\)\(..\).*\)#\2/\3/\4/\5/\1/descMetadata#'` 
+                let num_fetched+=1
+                curl -s "$url" > $DATADIR/mods/${pid}_mods.xml
+            fi
+        done 
+
+        Verbose "Fetched total of $num_fetched MODS files to the mods directory"
 
         if [[ "$force" == "-f" ]]; then
             Verbose "Forcing $solrname index rebuild with -f flag"
