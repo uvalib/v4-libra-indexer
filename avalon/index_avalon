@@ -123,7 +123,7 @@ do
         do 
             base="$avalonfedoraurl"
             url="${base}/"`echo $pid | sed -e 's#\(\(..\)\(..\)\(..\)\(..\).*\)#\2/\3/\4/\5/\1/descMetadata#'` 
-            echo $url
+            #echo $url
             curl -s "$url" > $DATADIR/mods/${pid}_mods.xml
         done 
 
