@@ -46,8 +46,11 @@ fi
 #fi
 
 query=`cat $SCRIPTDIR/query.txt | urlfix `
-parmsraw='&rows=10000&wt=xml&fl=*,read_access_group_ssim:[value v=""],read_access_virtual_group_ssim:[value v=""],read_access_ip_group_ssim:[value v=""]'
-parms=`echo $parmsraw | urlfix `
+baseparmsraw='&rows=10000&wt=xml'
+baseparms=`echo $baseparmsraw | urlfix `
+flparmsraw='&fl=*,read_access_group_ssim:[value v=""],read_access_virtual_group_ssim:[value v=""],read_access_ip_group_ssim:[value v=""]'
+flparms=`echo $flparmsraw | urlfix `
+parms="${baseparms}${flparms}"
 downloaded=0
 
 mkdir -p $DATADIR
@@ -66,13 +69,16 @@ do
     year=`date "+%Y"`
     solrname=`echo $line| cut -d '|' -f1`
     transform=`echo $line| cut -d '|' -f2`
-    avalonsolrurlfile=`echo $line| cut -d '|' -f3`
-    avalonfedoraurlfile=`echo $line| cut -d '|' -f4`
-    s3bucket=`echo $line| cut -d '|' -f5 | sed -e "s/2020/$year/"`
-    s3deletebucket=`echo $line| cut -d '|' -f6 | sed -e "s/2020/$year/"`
-    solrurl=`echo $line | cut -d '|' -f7`
+    avalonsystemurlfile=`echo $line| cut -d '|' -f3`
+    avalonsolrurlfile=`echo $line| cut -d '|' -f4`
+    avalonfedoraurlfile=`echo $line| cut -d '|' -f5`
+    s3bucket=`echo $line| cut -d '|' -f6 | sed -e "s/2020/$year/"`
+    s3deletebucket=`echo $line| cut -d '|' -f7 | sed -e "s/2020/$year/"`
+    solrurl=`echo $line | cut -d '|' -f8`
+    avalonsystemurl=`cat $SCRIPTDIR/$avalonsystemurlfile`
     avalonsolrurl=`cat $SCRIPTDIR/$avalonsolrurlfile`
     avalonfedoraurl=`cat $SCRIPTDIR/$avalonfedoraurlfile`
+    modsdir="mods_${solrname}"
 
     if [[ "$index" =~ $solrname ]]; then
         if [[ "$avalonsolrurl" =~ "private" ]]; then
@@ -93,12 +99,14 @@ do
         fi
         Verbose "Resolved AvalonFedoraURL to: $avalonfedoraurl"
 
+        Verbose "Avalon system base URL is: $avalonsystemurl"
+
         date=`$SCRIPTDIR/getlastupdatedate $avalonsolrurl`
         Verbose "Date of newest item in ${corename} is: $date"
 
        # lastupdate=`cat $DATADIR/lastupdate_$solrname`
         lastupdate=`cat $DATADIR/lastupdate_$solrname 2> /dev/null || echo '*'`
-        lastupdateNoT=`cat $DATADIR/lastupdate_$solrname | sed -e 's/T/ /'`
+        lastupdateNoT=`echo $lastupdate | sed -e 's/T/ /'`
         datequeryedited=`date -u -r $SCRIPTDIR/query.txt  "+%Y-%m-%dT%T.0Z"`
 
         Verbose "Backing up the ${corename} solr record dump from the last update"
@@ -108,13 +116,14 @@ do
         curl -s "$avalonsolrurl?q=$query$parms" | xmllint --format - | egrep -v "QTime" >  $DATADIR/${corename}_${solrname}_data.xml
         downloaded=1
 
-        cmp $DATADIR/${corename}_${solrname}_data.xml $DATADIR/${corename}_${solrname}_data.xml.bak
+        cmp -s $DATADIR/${corename}_${solrname}_data.xml $DATADIR/${corename}_${solrname}_data.xml.bak
         cmpresult=$?
 
         datescriptedited=`date -u -r $SCRIPTDIR/$transform  "+%Y-%m-%dT%T.0Z"`
-        datelasttransform=`date -u -r $DATADIR/virgo4_${corename}_${solrname}.xml  "+%Y-%m-%dT%T.0Z"`
-        datelastdownload=`cat $DATADIR/lastupdate_${solrname}`
-        Verbose "Storing last download date"
+        datelasttransform=`date -u -r $DATADIR/virgo4_${corename}_${solrname}.xml  "+%Y-%m-%dT%T.0Z" 2> /dev/null || echo "1970-01-01T01:00:00.0Z"`
+        #datelastdownload=`cat $DATADIR/lastupdate_${solrname}`
+        datelastdownload=`cat $DATADIR/lastupdate_${solrname} 2> /dev/null ||  echo "1970-01-01T01:00:00.0Z"`
+        Verbose "Storing last download date to lastupdate_${solrname}"
         echo `date -u -r "$DATADIR/${corename}_${solrname}_data.xml" "+%Y-%m-%dT%T.0Z"` > $DATADIR/lastupdate_${solrname}
 
         Verbose "Now retrieve the MODS datastreams from the fedora instance under the avalon system."
@@ -124,25 +133,26 @@ do
             timestampparm="&fq=timestamp:[${lastupdate} TO *]"
             timestampparm=`echo $timestampparm | urlfix `
         fi
-        curl -s "$avalonsolrurl?q=$query$parms$timestampparm" | xmllint --format - | egrep -v "QTime" | 
+        Verbose "MODS check URL with timestamp parm is: $avalonsolrurl?q=$query$baseparms&fl=id$timestampparm"
+        curl -s "${avalonsolrurl}?q=${query}${baseparms}&fl=id${timestampparm}" | xmllint --format - | 
                egrep '"id">' | sed -e 's/.*">\([^<]*\)<.*/\1/' > ${DATADIR}/${corename}_${solrname}_ids_to_fetch.txt
-        mkdir -p $DATADIR/mods
+        mkdir -p $DATADIR/${modsdir}
         let num_fetched=0
         for pid in `cat ${DATADIR}/${corename}_${solrname}_ids_to_fetch.txt`
         do 
             base="$avalonfedoraurl"
             url="${base}/"`echo $pid | sed -e 's#\(\(..\)\(..\)\(..\)\(..\).*\)#\2/\3/\4/\5/\1/descMetadata#'` 
             let num_fetched+=1
-            curl -s "$url" > $DATADIR/mods/${pid}_mods.xml
+            curl -s "$url" > $DATADIR/${modsdir}/${pid}_mods.xml
         done 
         cat $DATADIR/${corename}_${solrname}_data.xml | egrep '"id">' | sed -e 's/.*">\([^<]*\)<.*/\1/' > ${DATADIR}/${corename}_${solrname}_ids_to_check.txt
         for pid in `cat ${DATADIR}/${corename}_${solrname}_ids_to_check.txt`
         do 
-            if [[ ! -s $DATADIR/mods/${pid}_mods.xml ]] ; then 
+            if [[ ! -s $DATADIR/${modsdir}/${pid}_mods.xml ]] ; then 
                 base="$avalonfedoraurl"
                 url="${base}/"`echo $pid | sed -e 's#\(\(..\)\(..\)\(..\)\(..\).*\)#\2/\3/\4/\5/\1/descMetadata#'` 
                 let num_fetched+=1
-                curl -s "$url" > $DATADIR/mods/${pid}_mods.xml
+                curl -s "$url" > $DATADIR/${modsdir}/${pid}_mods.xml
             fi
         done 
 
@@ -168,7 +178,7 @@ do
 
             Verbose "Transforming the avalon/solr record dump into a new virgo/solr add document"
 
-            java ${JAVA_MEM} -jar $BASEDIR/saxon9.jar  $DATADIR/${corename}_${solrname}_data.xml  $SCRIPTDIR/$transform |
+            java ${JAVA_MEM} -jar $BASEDIR/saxon9.jar  $DATADIR/${corename}_${solrname}_data.xml  $SCRIPTDIR/$transform modsdir="./data/${modsdir}/" urlbase="$avalonbaseurl" |
                  sed -e 's/\\n/\&#10;/g' -e 's/<?xml version="1.0" encoding="UTF-8"?>//'  > $DATADIR/virgo4_${corename}_${solrname}.xml 2>&1 | vlog
             newdata=1
         fi
@@ -185,9 +195,9 @@ do
 
         num_to_delete=`cat $DATADIR/records_to_delete_${corename}_${solrname}.ids | wc -l`
         Verbose "Diff output contains $num_to_delete records for $corename"
-        if [[ "$num_added" != "$num_in_solr" && "$num_to_delete" == "0" ]] ; then
-            diff $diff_flag $DATADIR/cur_ids_in_solr.ids $DATADIR/cur_ids_being_added.ids | vlog 
-        fi
+        #if [[ "$num_added" != "$num_in_solr" && "$num_to_delete" == "0" ]] ; then
+        #    diff $diff_flag $DATADIR/cur_ids_in_solr.ids $DATADIR/cur_ids_being_added.ids | vlog 
+        #fi
 
         if [ -s $DATADIR/records_to_delete_${corename}_${solrname}.ids ] ; then
             Verbose "Some records in virgo solr that are not in the new dump of all records"

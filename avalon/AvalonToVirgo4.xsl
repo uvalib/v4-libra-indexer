@@ -4,7 +4,8 @@
     xmlns:mods="http://www.loc.gov/mods/v3"
     xmlns:rm="http://hydra-collab.stanford.edu/schemas/rightsMetadata/v1" exclude-result-prefixes="l mods rm">
     <xsl:output indent="yes" />
-    <xsl:variable name="urlbase" select="string('https://avalon-dev.lib.virginia.edu')" />
+    <xsl:param name="urlbase" select="string('https://avalon-dev.lib.virginia.edu')" />
+    <xsl:param name="modsdir" select="string('./data/mods/')" />
     <xsl:variable name="lowercase" select="'abcdefghijklmnopqrstuvwxyz    '"/>
     <xsl:variable name="uppercase" select="'ABCDEFGHIJKLMNOPQRSTUVWXYZ,;-:.'"/>
     <xsl:variable name="shadowed_collection_list" select="document('./CollectionShadow.xml')"/>
@@ -43,7 +44,7 @@
               <!--             <field name="digital_collection_f_stored">Libra Repository</field>  -->
               
               <!-- Load MODS data from file based on filename built from id.  Invoke data extraction from MODS document -->
-              <xsl:variable name="mods_doc" select="document(concat('./data/mods/', $avalonId, '_mods.xml'))"/>
+              <xsl:variable name="mods_doc" select="document(concat($modsdir, $avalonId, '_mods.xml'))"/>
   
               <xsl:apply-templates select="$mods_doc/node()"/>
               

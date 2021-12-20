@@ -1,1 +1,1 @@
-http://fedora-avalon-staging.private.staging:8080/fedora/rest/avalon
+http://fedora-avalon-production.private.production:8080/fedora/rest/avalon
