@@ -177,8 +177,9 @@ do
             mv $DATADIR/virgo4_${corename}_${solrname}.xml $DATADIR/virgo4_${corename}_${solrname}.xml.bak  2> /dev/null
 
             Verbose "Transforming the avalon/solr record dump into a new virgo/solr add document"
+            Verbose "  using URL ${avalonsystemurl} as basis for url_a field"
 
-            java ${JAVA_MEM} -jar $BASEDIR/saxon9.jar  $DATADIR/${corename}_${solrname}_data.xml  $SCRIPTDIR/$transform modsdir="./data/${modsdir}/" urlbase="$avalonbaseurl" |
+            java ${JAVA_MEM} -jar $BASEDIR/saxon9.jar  $DATADIR/${corename}_${solrname}_data.xml  $SCRIPTDIR/$transform modsdir="./data/${modsdir}/" urlbase="$avalonsystemurl" |
                  sed -e 's/\\n/\&#10;/g' -e 's/<?xml version="1.0" encoding="UTF-8"?>//'  > $DATADIR/virgo4_${corename}_${solrname}.xml 2>&1 | vlog
             newdata=1
         fi
