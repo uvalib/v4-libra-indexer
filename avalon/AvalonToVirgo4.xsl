@@ -85,8 +85,6 @@
               </xsl:if>
                <field name="format_f_stored">Online</field>
                 <!-- flat_broke_with_children_women_in_the_age_of_welfare_reform//video -->
-              <field name="uva_availability_f_stored">On shelf</field>
-              <field name="anon_availability_f_stored">On shelf</field>
               <field name="uva_availability_f_stored">Online</field>
               <field name="anon_availability_f_stored">Online</field>
               <field name="record_date_stored">
