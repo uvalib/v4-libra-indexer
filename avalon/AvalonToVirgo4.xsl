@@ -62,28 +62,60 @@
                       </xsl:otherwise>
                   </xsl:choose>
               </xsl:variable>
+              <xsl:variable name="default_title">
+                  <xsl:choose>
+                      <xsl:when test="str[@name = 'title_tesi']/text()">
+                          <xsl:value-of select="normalize-space(str[@name = 'title_tesi']/text())"/>
+                      </xsl:when>
+                      <xsl:when test="$audio and not($video)">
+                          <xsl:value-of select="'Untitled Sound Recording'"/>
+                      </xsl:when>
+                      <xsl:otherwise>
+                          <xsl:value-of select="'Untitled Video'"/>
+                      </xsl:otherwise>
+                  </xsl:choose>
+              </xsl:variable>    
               <xsl:variable name="cleaned_title" >
-                    <xsl:call-template name="cleantitle">
-                        <xsl:with-param name="title" select="normalize-space(str[@name = 'title_tesi']/text())"/>
-                        <xsl:with-param name="language" select="$lang_name"/>
-                    </xsl:call-template>
-                </xsl:variable>
+                  <xsl:call-template name="cleantitle">
+                      <xsl:with-param name="title" select="$default_title"/>
+                      <xsl:with-param name="language" select="$lang_name"/>
+                  </xsl:call-template>
+              </xsl:variable>
                 
-              <xsl:if test="$audio and not($video)">
-                  <field name="url_label_str_stored">Listen Online</field>
-                  <field name="pool_f">music_recordings</field>
-                  <field name="format_f_stored">Sound Recording</field>
-                  <field name="work_title3_key_ssort"><xsl:value-of select="translate(lower-case(concat($cleaned_title, '//MusicRecording')), ' ', '_')" /></field>
-                  <field name="work_title2_key_ssort"><xsl:value-of select="translate(lower-case(concat($cleaned_title, '/', normalize-space($mods_doc/mods:mods/mods:name[1]/mods:namePart/text()), '/MusicRecording')), ' ', '_')" /></field>
-              </xsl:if>
-              <xsl:if test="$video">
-                  <field name="url_label_str_stored">Watch Online</field>
-                  <field name="pool_f">video</field>
-                  <field name="format_f_stored">Video</field>
-                  <field name="work_title3_key_ssort"><xsl:value-of select="translate(lower-case(concat($cleaned_title, '//video')), ' ', '_')" /></field>
-                  <field name="work_title2_key_ssort"><xsl:value-of select="translate(lower-case(concat($cleaned_title, '/', normalize-space($mods_doc/mods:mods/mods:name[1]/mods:namePart/text()), '/video')), ' ', '_')" /></field>
-              </xsl:if>
-               <field name="format_f_stored">Online</field>
+              <xsl:choose>
+                  <xsl:when test="$audio and not($video)">
+                      <field name="url_label_str_stored">Listen Online</field>
+                      <field name="pool_f">music_recordings</field>
+                      <field name="format_f_stored">Sound Recording</field>
+                      <field name="work_title3_key_ssort"><xsl:value-of select="translate(lower-case(concat($cleaned_title, '//MusicRecording')), ' ', '_')" /></field>
+                      <field name="work_title2_key_ssort"><xsl:value-of select="translate(lower-case(concat($cleaned_title, '/', normalize-space($mods_doc/mods:mods/mods:name[1]/mods:namePart/text()), '/MusicRecording')), ' ', '_')" /></field>
+                  </xsl:when>
+                  <xsl:when test="$video">
+                      <field name="url_label_str_stored">Watch Online</field>
+                      <field name="pool_f">video</field>
+                      <field name="format_f_stored">Video</field>
+                      <field name="work_title3_key_ssort"><xsl:value-of select="translate(lower-case(concat($cleaned_title, '//video')), ' ', '_')" /></field>
+                      <field name="work_title2_key_ssort"><xsl:value-of select="translate(lower-case(concat($cleaned_title, '/', normalize-space($mods_doc/mods:mods/mods:name[1]/mods:namePart/text()), '/video')), ' ', '_')" /></field>
+                  </xsl:when>
+                  <xsl:otherwise>
+                      <field name="url_label_str_stored">Access Online</field>
+                      <field name="pool_f">catalog</field>
+                      <field name="work_title3_key_ssort"><xsl:value-of select="translate(lower-case(concat($cleaned_title, '//video')), ' ', '_')" /></field>
+                      <field name="work_title2_key_ssort"><xsl:value-of select="translate(lower-case(concat($cleaned_title, '/', normalize-space($mods_doc/mods:mods/mods:name[1]/mods:namePart/text()), '/video')), ' ', '_')" /></field>
+                  </xsl:otherwise>
+              </xsl:choose>
+              
+              <field name="title_tsearch_stored">
+                  <xsl:value-of select="$default_title"/>
+              </field>
+              <field name="full_title_tsearch_stored">
+                  <xsl:value-of select="$default_title"/>
+              </field>
+              <field name="title_ssort_stored">
+                  <xsl:value-of select="$cleaned_title"/>
+              </field>
+
+              <field name="format_f_stored">Online</field>
                 <!-- flat_broke_with_children_women_in_the_age_of_welfare_reform//video -->
               <field name="uva_availability_f_stored">Online</field>
               <field name="anon_availability_f_stored">Online</field>
@@ -167,18 +199,6 @@
         <xsl:value-of select="format-number($seconds mod 60, ':00')"/>
     </xsl:template>
     
-    <xsl:template match="mods:titleInfo[@usage = 'primary']">
-        <field name="title_tsearch_stored">
-            <xsl:value-of select="mods:title"/>
-        </field>
-        <field name="full_title_tsearch_stored">
-            <xsl:value-of select="mods:title"/>
-        </field>
-        <field name="title_ssort_stored">
-            <xsl:value-of select="normalize-space(translate(mods:title, $uppercase, $lowercase))"/>
-        </field>
-    </xsl:template>
-
     <xsl:template match="mods:name">
         <xsl:variable name="name">
             <xsl:call-template name="stripParentheticRole">
@@ -272,22 +292,6 @@
     </xsl:template>
 
     <xsl:template match="mods:originInfo/mods:dateIssued">
-<!--        <xsl:variable name="yearIssued" select="number(substring(text(), 1, 4))"/>
-        <xsl:if test="number($yearIssued)">
-            <field name="published_display_tsearch_stored">
-                <xsl:value-of select="$yearIssued"/>
-            </field>
-            <field name="published_date">
-                <xsl:value-of select="concat($yearIssued, '-01-01T00:00:00Z')"/>
-            </field>
-            <field name="published_daterange">
-                <xsl:value-of select="$yearIssued"/>
-            </field>
-            <field name="published_display_a">
-                <xsl:value-of select="$yearIssued"/>
-            </field>
-        </xsl:if>
--->     
         <xsl:if test="./text() != ''">
             <xsl:variable name="dateString" select="./text()"/>
             <xsl:call-template name="fixDate">
@@ -461,21 +465,6 @@
         </xsl:analyze-string>
     </xsl:template>
 
-<!--    <xsl:template name="relatedNames">
-        <xsl:param name="authors" />
-        <xsl:param name="contributors" />
-        <xsl:for-each select="tokenize($authors,'&quot;id&quot;')" >
-            <xsl:sort select="translate(substring-before(substring-after(., 'index&quot;:'), ','), '\&quot;', '')" /><xsl:value-of select="'&quot;first_name'"/>
-            <xsl:value-of select="substring-before(substring-after(., 'first_name'),',&quot;comput')"/>
-            <xsl:value-of select="'###'"/>
-        </xsl:for-each>
-        <xsl:for-each select="tokenize($contributors,'&quot;id&quot;')">
-            <xsl:sort select="translate(substring-before(substring-after(., 'index&quot;:'), ','), '\&quot;', '')" /><xsl:value-of select="'&quot;first_name'"/>
-            <xsl:value-of select="substring-before(substring-after(., 'first_name'),',&quot;comput')"/>
-            <xsl:value-of select="'###'"/>
-        </xsl:for-each>
-    </xsl:template>-->
-    
     <xsl:template name="formatDateTime">
         <xsl:param name="dateTime" />
         <xsl:variable name="date" select="substring-before($dateTime, 'T')" />
@@ -496,42 +485,6 @@
         <xsl:variable name="day" select="substring-after(substring-after($dateFixed, '/'), '/')" />
         <xsl:value-of select="substring(concat($year, $month, $day), 1, 8)" />
     </xsl:template>
-    
-     
-<!--    <xsl:template name="getFirstName">
-        <xsl:param name="node"/>
-        <xsl:variable name="othername" select="concat(substring-before($node/@name, '_last_name_t'), '_first_name_t')"/>
-        <xsl:variable name="othernode" select="$node/../arr[@name = $othername]" />
-        <xsl:value-of select="$othernode/str[1]"/>
-    </xsl:template>
-    
-    <xsl:template name="lastcommafirst">
-        <xsl:param name="last"/>
-        <xsl:param name="first"/>
-        <xsl:choose>
-            <xsl:when test="string-length($last)= 0"><xsl:value-of select="$first"/></xsl:when>
-            <xsl:otherwise><xsl:value-of select="concat($last,', ',$first)"/></xsl:otherwise>
-        </xsl:choose>    
-    </xsl:template>
-    -->
-<!--     <xsl:template name="year_multisort_publisheddatefacet">
-        <xsl:param name="yearPub" />        
-        <xsl:variable name="curDate" select="number(substring-before(string(current-date()), '-'))"/>
-        <xsl:variable name="yearDiff" select="$curDate - $yearPub" />
-        <field name="year_multisort_i">
-            <xsl:value-of select="$yearPub" />
-        </field>
-    </xsl:template> -->
-    
-<!--    <xsl:template name="dataverse" >
-        <xsl:param name="libra-id"/>
-        <xsl:variable name="dataverse-id" select="$dataverse-map/entry[libra = $libra-id]/dataverse"/>
-        <xsl:if test="string-length(string($dataverse-id)) > 0">
-            <field name="url_display">
-                <xsl:value-of select="concat($dataverse-url, $dataverse-id, '||UVa Libra Data')"/>
-            </field>
-        </xsl:if>
-    </xsl:template> -->
     
     <xsl:template name="cleantitle">
         <xsl:param name="title"/>
@@ -569,158 +522,5 @@
         <xsl:variable name="title5" select='replace($title4,"&apos;","")' />        
         <xsl:value-of select="replace($title5,'[ ][ ]+',' ')" />  
     </xsl:template>
-    
-<!--    <xsl:template name="publisherinfo">
-        <xsl:variable name="datestring" >
-            <xsl:choose>
-                <xsl:when test="matches(arr[@name='published_date_tesim']/str, '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:.*$')">
-                    <xsl:value-of select="substring(arr[@name='published_date_tesim']/str, 1, 4)"/>
-                </xsl:when>
-                <xsl:when test="arr[@name='published_date_tesim']/str != ''">
-                    <xsl:value-of select="arr[@name='published_date_tesim']/str"/>
-                </xsl:when>
-                <xsl:otherwise>
-                    <xsl:value-of select="substring(arr[@name='date_created_tesim']/str , 1, 4)"/>
-                </xsl:otherwise>
-            </xsl:choose>
-        </xsl:variable>
-        <xsl:choose>
-            <xsl:when test="arr[@name='publisher_tesim']/str != ''">
-                <xsl:value-of select="concat(arr[@name='publisher_tesim']/str, ', ', $datestring)" />
-            </xsl:when>
-        </xsl:choose>        
-    </xsl:template>-->
-    
-<!--    <xsl:template name="publisheddate">
-        <xsl:variable name="datestring" >
-            <xsl:choose>
-                <xsl:when test="matches(arr[@name='published_date_tesim']/str, '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:.*$')">
-                    <xsl:value-of select="substring(arr[@name='published_date_tesim']/str, 1, 10)"/>
-                </xsl:when>
-                <xsl:when test="arr[@name='published_date_tesim']/str != ''">
-                    <xsl:value-of select="arr[@name='published_date_tesim']/str"/>
-                </xsl:when>
-                <xsl:otherwise>
-                    <xsl:value-of select="substring(replace(arr[@name='date_created_tesim']/str, '/', '-'), 1, 10)"/>
-                </xsl:otherwise>
-            </xsl:choose>
-        </xsl:variable>
-        <xsl:value-of select="$datestring" />
-    </xsl:template>-->
-    
-<!--    <xsl:template name="publisheddatetime">
-        <xsl:variable name="datetimestring" >
-            <xsl:choose>
-                <xsl:when test="matches(arr[@name='published_date_tesim']/str, '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:.*$')">
-                    <xsl:value-of select="concat(substring(arr[@name='published_date_tesim']/str, 1, 17), '00Z')"/>
-                </xsl:when>
-                <xsl:when test="matches(arr[@name='published_date_tesim']/str, '\d{4}[-/]\d{2}[-/]-\d{2}')">
-                    <xsl:value-of select="concat(replace(substring(arr[@name='published_date_tesim']/str, 1, 10), '/', '-'), 'T00:00:00Z')"/>
-                </xsl:when>
-                <xsl:when test="matches(arr[@name='published_date_tesim']/str, '\d{4}')">
-                    <xsl:value-of select="concat(arr[@name='published_date_tesim']/str, '-01-01T00:00:00Z')"/>
-                </xsl:when>
-                <xsl:otherwise>
-                    <xsl:value-of select="concat(substring(replace(arr[@name='date_created_tesim']/str, '/', '-'), 1, 10),  'T00:00:00Z')"/>
-                </xsl:otherwise>
-            </xsl:choose>
-        </xsl:variable>
-        <xsl:value-of select="$datetimestring" />
-    </xsl:template>
-    
-    <xsl:template name="publisheddateYYYY">
-        <xsl:variable name="datestring" >
-            <xsl:choose>
-                <xsl:when test="matches(arr[@name='published_date_tesim']/str, '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:.*$')">
-                    <xsl:value-of select="substring(arr[@name='published_date_tesim']/str, 1, 4)"/>
-                </xsl:when>
-                <xsl:when test="matches(arr[@name='published_date_tesim']/str, '.*\d{4}.*')">
-                    <xsl:analyze-string select="arr[@name='published_date_tesim']/str" regex=".*(\d\d\d\d).*">
-                        <xsl:matching-substring>
-                            <xsl:value-of select="regex-group(1)"/>
-                        </xsl:matching-substring>
-                    </xsl:analyze-string>
-                </xsl:when>
-                <xsl:otherwise>
-                    <xsl:value-of select="substring(arr[@name='date_created_tesim']/str , 1, 4)"/>
-                </xsl:otherwise>
-            </xsl:choose>
-        </xsl:variable>
-        <xsl:value-of select="$datestring"/>    
-    </xsl:template>
--->
-    <!-- handles fixing all of the dates. Can create a date or a daterange -->
-<!--    <xsl:template name="fixDate">
-        <xsl:param name="field"/>
-        <xsl:param name="datestring"/>
-        <xsl:param name="monthDefault" />
-        <xsl:param name="dayDefault" />
-        <xsl:param name="timeDefault"/>
-        <xsl:param name="range"/>
-        <xsl:variable name="fmtdate">
-            <xsl:choose>
-                <xsl:when test="matches($datestring, '([0-9][0-9][0-9][0-9])[~?]?[/]([0-9][0-9][0-9][0-9])[~?]?(.*)')">
-                    <xsl:analyze-string select="$datestring" regex="([0-9][0-9][0-9][0-9])[~?]?[/]([0-9][0-9][0-9][0-9])[~?]?(.*)">
-                        <xsl:matching-substring>
-                            <xsl:variable name="year1" select="number(regex-group(1))"/>
-                            <xsl:variable name="year2" select="number(regex-group(2))"/>
-                            <xsl:choose>
-                                <xsl:when test="$range = 'true'">
-                                    <xsl:value-of select="concat('[',$year1, ' TO ', $year2, ']')"/>
-                                </xsl:when>
-                                <xsl:otherwise>
-                                    <xsl:value-of select="concat($year1,  $monthDefault, $dayDefault, $timeDefault)"/>
-                                </xsl:otherwise>
-                            </xsl:choose>
-                        </xsl:matching-substring>
-                    </xsl:analyze-string>
-                </xsl:when>
-                <xsl:when test="matches($datestring, '([0-9][0-9][0-9][0-9])[-/]([0-9][0-9]?)[-/]([0-9][0-9]?)(.*)')">
-                    <xsl:analyze-string select="$datestring" regex="([0-9][0-9][0-9][0-9])[-/]([0-9][0-9]?)[-/]([0-9][0-9]?)(.*)">
-                        <xsl:matching-substring>
-                            <xsl:variable name="month" select="number(regex-group(2))"/>
-                            <xsl:variable name="day" select="number(regex-group(3))"/>
-                            <xsl:variable name="year" select="number(regex-group(1))"/>
-                            <xsl:value-of select="concat($year, '-', format-number($month, '00'), '-', format-number($day, '00'), $timeDefault)" />
-                        </xsl:matching-substring>
-                    </xsl:analyze-string>
-                </xsl:when>
-                <xsl:when test="matches($datestring, '[^0-9]*([0-9][0-9][0-9][0-9])(.*)')">
-                    <xsl:analyze-string select="$datestring" regex="[^0-9]*([0-9][0-9][0-9][0-9])(.*)">
-                        <xsl:matching-substring>
-                            <xsl:variable name="year" select="number(regex-group(1))"/>
-                            <xsl:value-of select="concat($year, $monthDefault, $dayDefault, $timeDefault)" />
-                        </xsl:matching-substring>
-                    </xsl:analyze-string>
-                </xsl:when>
-                <xsl:when test="matches($datestring, '[^0-9]*([0-9][0-9][0-9])X(.*)')">
-                    <xsl:analyze-string select="$datestring" regex="[^0-9]*([0-9][0-9][0-9])X(.*)">
-                        <xsl:matching-substring>
-                            <xsl:variable name="yearstart" select="number(regex-group(1))"/>
-                            <xsl:variable name="yearunits" select="number(regex-group(1))"/>
-                            <xsl:choose>
-                                <xsl:when test="$range = 'true'">
-                                    <xsl:value-of select="concat('[',$yearstart, '0', ' TO ', $yearstart, '9', ']')"/>
-                                </xsl:when>
-                                <xsl:otherwise>
-                                    <xsl:value-of select="concat($yearstart,'5', $monthDefault, $dayDefault, $timeDefault)"/>
-
-                                </xsl:otherwise>
-                            </xsl:choose>
-                        </xsl:matching-substring>
-                    </xsl:analyze-string>
-                </xsl:when>
-                <xsl:otherwise>
-                    <!-\-   <xsl:value-of select="concat('%%%%%', $datestring, '%%%%%')"/> -\->
-                </xsl:otherwise>
-            </xsl:choose>
-        </xsl:variable>
-        <xsl:if test="$fmtdate != ''">
-            <xsl:element name="field">
-                <xsl:attribute name="name"><xsl:value-of select="$field"/></xsl:attribute>
-                <xsl:value-of select="$fmtdate" />
-            </xsl:element>
-        </xsl:if>
-    </xsl:template>-->
 
 </xsl:stylesheet>
