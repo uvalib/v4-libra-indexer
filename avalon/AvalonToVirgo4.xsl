@@ -125,7 +125,7 @@
   
               <field name="doc_type_f_stored">avalon</field>
               <!--              <field name="source_facet">Libra2 Repository</field> -->
-              <xsl:for-each select="doc[arr[@name='collection_ssim']]/str">
+              <xsl:for-each select="arr[@name='collection_ssim']/str">
                   <field name="digital_collection_f_stored"><xsl:value-of select="."/></field>
               </xsl:for-each>
               <field name="data_source_f_stored">avalon</field>
