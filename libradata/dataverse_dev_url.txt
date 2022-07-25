@@ -1,0 +1,2 @@
+http://dvdev.lib.virginia.edu:8983/solr/collection1/select
+

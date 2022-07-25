@@ -6,7 +6,7 @@ corename=$( basename $SCRIPTDIR )
 DATADIR=${SCRIPTDIR}/data
 BASEDIR=$( dirname $SCRIPTDIR )/common
 
-DATAVERSEURL="http://dataverse.lib.virginia.edu:8983/solr/collection1/select"
+DATAVERSEURL=$1
 
 query=`cat $SCRIPTDIR/query.txt | sed -e 's/["]/%22/g' -e 's/ /+/g' -e 's/:/%3A/g' `
 
