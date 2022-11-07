@@ -297,8 +297,8 @@
                     <xsl:with-param name="libra-id"><xsl:value-of select="string(./str[@name='id'])"/></xsl:with-param>
                 </xsl:call-template>
 
-                <xsl:if test="arr[@name='relatedMaterial' or @name='relatedDatasets']/str != ''">
-                    <xsl:for-each select="arr[@name='relatedMaterial' or @name='relatedDatasets']/str">
+                <xsl:if test="arr[@name='relatedMaterial']/str != ''">
+                    <xsl:for-each select="arr[@name='relatedMaterial']/str">
                         <field name="url_supp_str_stored">
                             <xsl:call-template name="suppurl">
                                 <xsl:with-param name="suppstr" select="text()"/>
@@ -307,6 +307,37 @@
                         <field name="url_label_supp_str_stored">
                             <xsl:call-template name="suppurllabel">
                                 <xsl:with-param name="suppstr" select="text()"/>
+                                <xsl:with-param name="defaultLabel" select="'Related Material: '"/>
+                            </xsl:call-template>
+                        </field>
+                    </xsl:for-each>
+                </xsl:if>
+                <xsl:if test="arr[@name='relatedDatasets']/str != ''">
+                    <xsl:for-each select="arr[@name='relatedDatasets']/str">
+                        <field name="url_supp_str_stored">
+                            <xsl:call-template name="suppurl">
+                                <xsl:with-param name="suppstr" select="text()"/>
+                            </xsl:call-template>
+                        </field>
+                        <field name="url_label_supp_str_stored">
+                            <xsl:call-template name="suppurllabel">
+                                <xsl:with-param name="suppstr" select="text()"/>
+                                <xsl:with-param name="defaultLabel" select="'Related Dataset: '"/>
+                            </xsl:call-template>
+                        </field>
+                    </xsl:for-each>
+                </xsl:if>
+                <xsl:if test="arr[@name='publicationURL']/str != ''">
+                    <xsl:for-each select="arr[@name='publicationURL']/str">
+                        <field name="url_supp_str_stored">
+                            <xsl:call-template name="suppurl">
+                                <xsl:with-param name="suppstr" select="text()"/>
+                            </xsl:call-template>
+                        </field>
+                        <field name="url_label_supp_str_stored">
+                            <xsl:call-template name="suppurllabel">
+                                <xsl:with-param name="suppstr" select="text()"/>
+                                <xsl:with-param name="defaultLabel" select="'Related Publication: '"/>
                             </xsl:call-template>
                         </field>
                     </xsl:for-each>
@@ -320,6 +351,7 @@
                     <field name="url_label_supp_str_stored">
                         <xsl:call-template name="suppurllabel">
                             <xsl:with-param name="suppstr" select="str[@name='alternativeURL']/text()"/>
+                            <xsl:with-param name="defaultLabel" select="'Alternate URL: '"/>
                         </xsl:call-template>
                     </field>
                 </xsl:if>
@@ -412,15 +444,23 @@
 
     <xsl:template name="suppurl">
         <xsl:param name="suppstr" />
-        <xsl:variable name="label" select="substring-before($suppstr, ': http')" />
-        <xsl:variable name="url" select="replace($suppstr, '.*: http', 'http')" />
+        <xsl:variable name="label" select="substring-before($suppstr, 'http')" />
+        <xsl:variable name="url" select="replace($suppstr, '.*http', 'http')" />
         <xsl:value-of select="$url"/>
     </xsl:template>
     <xsl:template name="suppurllabel">
         <xsl:param name="suppstr" />
-        <xsl:variable name="label" select="substring-before($suppstr, ': http')" />
-        <xsl:variable name="url" select="replace($suppstr, '.*: http', 'http')" />
-        <xsl:value-of select="$label"/>
+        <xsl:param name="defaultLabel"/>
+        <xsl:variable name="label" select="substring-before($suppstr, 'http')" />
+        <xsl:variable name="url" select="replace($suppstr, '.*http', 'http')" />
+        <xsl:choose>
+            <xsl:when test="$label != ''">
+                <xsl:value-of select="$label"/>
+            </xsl:when>
+            <xsl:otherwise>
+                <xsl:value-of select="$defaultLabel"/>
+            </xsl:otherwise>
+        </xsl:choose>
     </xsl:template>
     
     <xsl:template name="firstspacelastcommaaffil">

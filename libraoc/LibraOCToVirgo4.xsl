@@ -343,7 +343,7 @@
                         <field name="url_supp_str_stored">
                             <xsl:value-of select="."/>
                         </field>
-                        <field name="url_supp_label_str_stored">
+                        <field name="url_label_supp_str_stored">
                             <xsl:value-of select="'Related Materials'"/>
                         </field>
                     </xsl:if>
