@@ -46,7 +46,7 @@ fi
 #fi
 
 query=`cat $SCRIPTDIR/query.txt | sed -e 's/["]/%22/g' -e 's/[*]/%2A/g' -e 's/[[]/%5B/g' -e 's/[]]/%5D/g' -e 's/ /+/g'`
-parms='&rows=10000&wt=xml&fl=*'
+parms='&rows=20000&wt=xml&fl=*'
 downloaded=0
 
 mkdir -p $DATADIR
