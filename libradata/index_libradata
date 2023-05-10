@@ -46,8 +46,9 @@ fi
 #fi
 
 query=`cat $SCRIPTDIR/query.txt | sed -e 's/["]/%22/g' -e 's/[*]/%2A/g' -e 's/[[]/%5B/g' -e 's/[]]/%5D/g' -e 's/ /+/g'`
-parms='&rows=10000&wt=xml&fl=*'
+parms='&wt=xml&fl=*'
 downloaded=0
+let exit_code=0
 
 mkdir -p $DATADIR
 
@@ -90,13 +91,22 @@ do
 
         Verbose "Backing up the ${corename} solr record dump from the last update"
         mv $DATADIR/${corename}_${solrname}_data.xml $DATADIR/${corename}_${solrname}_data.xml.bak 2> /dev/null
-        Verbose "Querying the ${corename} solr for all records matching the query in the query file"
-        Verbose "Using URL of: $LIBRAURL?q=$query$parms"
-        curl -s "$LIBRAURL?q=$query$parms" | xmllint --format - | egrep -v "QTime" >  $DATADIR/${corename}_${solrname}_data.xml
+        numRecordsToReceive=`curl -s "$LIBRAURL?q=$query$parms&rows=0" | egrep "numFound" | sed -e 's/^.*numFound="//' -e 's/".*$//'`
+        Verbose "Querying the ${corename} solr for all ${numRecordsToReceive} records matching the query in the query file"
+        numParm="&rows=${numRecordsToReceive}"
+        Verbose "Using URL of: $LIBRAURL?q=$query$parms$numParm"
+        curl -s "$LIBRAURL?q=$query$parms$numParm" | xmllint --format - | egrep -v "QTime" >  $DATADIR/${corename}_${solrname}_data.xml
         downloaded=1
 
         cmp $DATADIR/${corename}_${solrname}_data.xml $DATADIR/${corename}_${solrname}_data.xml.bak
         cmpresult=$?
+        numReceived=`cat $DATADIR/${corename}_${solrname}_data.xml | egrep "<doc>" | wc -l`
+        if [[ "$numRecordsToReceive" != "$numReceived" ]] ; then
+            Echo "Error: requested $numRecordsToReceive, but received $numReceived"
+            let exit_code=1
+        else
+            Verbose "Received $numReceived records -- as requested"
+        fi
 
         datescriptedited=`date -u -r $SCRIPTDIR/$transform  "+%Y-%m-%dT%T.0Z"`
         datelasttransform=`date -u -r $DATADIR/virgo4_${corename}_${solrname}.xml  "+%Y-%m-%dT%T.0Z"`
@@ -139,9 +149,9 @@ do
 
         num_to_delete=`cat $DATADIR/records_to_delete_${corename}_${solrname}.ids | wc -l`
         Verbose "Diff output contains $num_to_delete records for $corename"
-        if [[ "$num_added" != "$num_in_solr" && "$num_to_delete" == "0" ]] ; then
-            diff $diff_flag $DATADIR/cur_ids_in_solr.ids $DATADIR/cur_ids_being_added.ids | vlog 
-        fi
+        #if [[ "$num_added" != "$num_in_solr" && "$num_to_delete" == "0" ]] ; then
+        #    diff $diff_flag $DATADIR/cur_ids_in_solr.ids $DATADIR/cur_ids_being_added.ids | vlog 
+        #fi
 
         if [ -s $DATADIR/records_to_delete_${corename}_${solrname}.ids ] ; then
             Verbose "Some records in virgo solr that are not in the new dump of all records"
@@ -164,4 +174,9 @@ do
     fi
 done
     
+if [[ "$exit_code" != "0" ]]; then
+    Echo "Didn't receive all of the records, returning an error code"
+fi
 Verbose "Done updating core $corename"
+exit $exit_code
+`
