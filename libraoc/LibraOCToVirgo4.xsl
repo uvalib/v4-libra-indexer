@@ -178,6 +178,9 @@
                     <xsl:variable name="lastName">
                         <xsl:value-of select="substring-before(substring-after(., 'last_name&quot;:&quot;'), '&quot;')"/>
                     </xsl:variable>
+                    <xsl:variable name="department">
+                        <xsl:value-of select="substring-before(substring-after(., 'department&quot;:&quot;'), '&quot;')"/>
+                    </xsl:variable>
                     <xsl:choose>
                         <xsl:when test="$isNoneProvided != 'true'" >
                             <field name="author_tsearch_stored" >
@@ -191,6 +194,11 @@
                              </field> 
                         </xsl:when>
                     </xsl:choose>
+                    <xsl:if test="$department != ''">
+                        <field name="department_tsearch_f_stored" >
+                            <xsl:value-of select="$department"/>
+                        </field>
+                    </xsl:if>
                 </xsl:for-each>
                 
                 <!--  stuff for contributors -->
