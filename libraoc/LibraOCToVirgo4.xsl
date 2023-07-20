@@ -195,7 +195,7 @@
                         </xsl:when>
                     </xsl:choose>
                     <xsl:if test="$department != ''">
-                        <field name="department_tsearch_f_stored" >
+                        <field name="department_tsearchf_stored" >
                             <xsl:value-of select="$department"/>
                         </field>
                     </xsl:if>

@@ -78,7 +78,7 @@
                     <field name="degree_tsearch_stored"><xsl:value-of select="."/></field>
                 </xsl:for-each>
                 <xsl:for-each select="arr[@name = 'department_tesim']/str">
-                    <field name="department_tsearch_f_stored"><xsl:value-of select="."/></field>
+                    <field name="department_tsearchf_stored"><xsl:value-of select="."/></field>
                 </xsl:for-each>
                 <field name="published_tsearch_stored">
                     <xsl:call-template name="publisherinfo"/>
