@@ -1,2 +1,1 @@
-http://dvdev.lib.virginia.edu:8983/solr/collection1/select
-
+http://dataverse-solr-staging.private.staging:8080/solr/collection1/select

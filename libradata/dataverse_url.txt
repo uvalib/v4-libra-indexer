@@ -1,2 +1,1 @@
-http://dataverse.lib.virginia.edu:8983/solr/collection1/select
-
+http://dataverse-solr-production.private.production:8080/solr/collection1/select
