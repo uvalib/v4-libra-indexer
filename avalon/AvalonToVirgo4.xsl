@@ -429,7 +429,7 @@
     </xsl:template>
     
     <xsl:template match="mods:relatedItem[@displayLabel]">
-        <field name="url_supp_label_str_stored">
+        <field name="url_label_supp_str_stored">
             <xsl:value-of select="@displayLabel"/>
         </field>
         <field name="url_supp_str_stored">
