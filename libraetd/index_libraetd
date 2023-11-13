@@ -140,7 +140,7 @@ do
         fi
         Verbose "Now figure out if any records need to be deleted"
         cat $DATADIR/virgo4_${corename}_${solrname}.xml | egrep '"id"' | sed -e 's/[^>]*>//' -e 's/<.*$//' | sort > $DATADIR/cur_ids_being_added.ids
-        curl -s "$solrurl/select?fl=id&q=data_source_f%3A${corename}&rows=10000" | egrep '"id":' | sed -e 's/.*":"//' -e 's/".*$//' | sort  > $DATADIR/cur_ids_in_solr.ids
+        curl -s "$solrurl/select?fl=id&q=data_source_f%3A${corename}&rows=20000" | egrep '"id":' | sed -e 's/.*":"//' -e 's/".*$//' | sort  > $DATADIR/cur_ids_in_solr.ids
         num_added=`cat $DATADIR/cur_ids_being_added.ids | wc -l`
         num_in_solr=`cat $DATADIR/cur_ids_in_solr.ids | wc -l`
         Verbose "Newly transformed file contains $num_added records for $corename"
