@@ -47,7 +47,13 @@
               <xsl:variable name="mods_doc" select="document(concat($modsdir, $avalonId, '_mods.xml'))"/>
   
               <xsl:apply-templates select="$mods_doc/node()"/>
-              
+
+              <xsl:for-each select="arr[@name='unit_ssim']">
+                  <xsl:call-template name="library_facet" >
+                      <xsl:with-param name="unit" select="str"/>
+                  </xsl:call-template>
+              </xsl:for-each>
+
               <field name="circulating_f">true</field>
               <field name="source_f_stored">Avalon</field>
               <field name="source_f_stored">UVA Library Digital Repository</field>
@@ -189,6 +195,53 @@
         </xsl:if>
     </xsl:template>
     
+    <xsl:template name="library_facet" >
+        <xsl:param name="unit" />
+        <xsl:variable name='library_facet'>
+            <!--
+              - OLE
+  - Albert and Shirley Small Special Collections Library
+  - Robertson Media Center
+  - University of Virginia School of Architecture
+  - Music Library
+  - Women, Gender, and Sexuality Program
+  - University of Virginia Department of Spanish, Italian, and Portuguese
+  - Claude Moore Health Sciences Library
+  - Scholars' Lab
+  - University of Virginia Library
+  - Language Commons
+  - Research & Learning Services
+  - Arthur J. Morris Law Library
+  - The Fralin Museum of Art
+            -->
+            <xsl:choose>
+                <xsl:when test="$unit='Albert and Shirley Small Special Collections Library'">
+                    <xsl:value-of select="'Special Collections'"/>
+                </xsl:when>
+                <xsl:when test="$unit='Robertson Media Center'">
+                    <xsl:value-of select="'Clemons'"/>
+                </xsl:when>
+                <xsl:when test="$unit='Music Library'">
+                    <xsl:value-of select="'Music'"/>
+                </xsl:when>
+                <xsl:when test="$unit='Claude Moore Health Sciences Library'">
+                    <xsl:value-of select="'Health Sciences'"/>
+                </xsl:when>
+                <xsl:when test="$unit='Arthur J. Morris Law Library'">
+                    <xsl:value-of select="'Law'"/>
+                </xsl:when>
+                <xsl:otherwise>
+                    <xsl:value-of select="''"/>
+                </xsl:otherwise>
+            </xsl:choose>
+        </xsl:variable>
+        <xsl:if test="$library_facet!=''">
+            <field name="library_f_stored" >
+                <xsl:value-of select="$library_facet" />
+            </field>
+        </xsl:if>
+    </xsl:template>
+
     <xsl:template name="runtime_fmt">
         <xsl:param name="millis"/>
         <xsl:variable name="seconds" select="floor($millis div 1000)"/>
