@@ -123,6 +123,7 @@
 
                 <!--  stuff for contributors -->
                 <xsl:for-each select="arr[@name = 'contributor_tesim']/str">
+                     <xsl:sort select="number(substring-before(., '&#10;'))" order="ascending"/>
                      <xsl:variable name="isNoneProvided">
                         <xsl:call-template name="isNoneProvided">
                             <xsl:with-param name="node" select="." />
