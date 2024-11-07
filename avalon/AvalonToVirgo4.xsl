@@ -481,6 +481,12 @@
         </field>
     </xsl:template>
     
+    <xsl:template match="mods:relatedItem[@type='series']/mods:titleInfo/mods:title">
+        <field name="title_series_tsearchf_stored">
+            <xsl:value-of select="text()"/>
+        </field>
+    </xsl:template>
+    
     <xsl:template match="mods:relatedItem[@displayLabel]">
         <field name="url_label_supp_str_stored">
             <xsl:value-of select="@displayLabel"/>
