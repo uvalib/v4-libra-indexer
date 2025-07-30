@@ -4,7 +4,7 @@
     xmlns:my="http://example.com/my-functions"
     exclude-result-prefixes="my">
     
-    <xsl:output omit-xml-declaration="yes" indent="yes"/>
+    <xsl:output method="xml" encoding="UTF-8" indent="yes" omit-xml-declaration="no" />
     <xsl:strip-space elements="*"/>
  
     <!-- Define a mapping for month names to month numbers -->
@@ -23,7 +23,8 @@
         <month name="December" number="12"/>
     </xsl:variable>
     
-        
+    <xsl:param name="avalonSolrUrlBase" select="'http://10.130.113.231:8080/solr/avalon/select'" />
+    <xsl:variable name="avalonSolrUrlStart" select="'?q=id:'" />    
     
     
     <!-- Match and copy only the doc elements that meet the conditions -->
@@ -151,7 +152,7 @@
         <xsl:param name="dateString"/>
         <!-- Extract parts of the date string -->
         <xsl:variable name="monthName" select="substring-before($dateString, ' ')" />
-        <xsl:variable name="day" select="xs:numeric(substring-before(substring-after($dateString, ' '), ','))" />
+        <xsl:variable name="day" select="xs:integer(substring-before(substring-after($dateString, ' '), ','))" />
         <xsl:variable name="year" select="substring-after($dateString, ', ')" />
         
         <!-- Convert month name to number -->
@@ -207,12 +208,16 @@
             </xsl:call-template>
         </xsl:variable>  -->
         <xsl:variable name="videoUrl" select="substring-after(arr[@name='related_url_tesim']/str, 'here: ')"/>
+        <xsl:variable name="videoId" select="substring-after(arr[@name='related_url_tesim']/str, '/media_objects/')"/>
+        <xsl:variable name="avalonSolrUrl" select="concat($avalonSolrUrlBase, $avalonSolrUrlStart, $videoId, '&amp;wt=xml')" />
         <xsl:variable name="videoLabel" select="substring-before(arr[@name='related_url_tesim']/str, ' http')"/>
-        <xsl:variable name="videoData" select="unparsed-text($videoUrl)"/>
-        <xsl:variable name="duration" select="substring-before(substring-after($videoData,'&quot;duration&quot;:'), ',')"/>
-        <xsl:variable name="durationHours" select="floor(xs:numeric($duration) div 3600)"/>
-        <xsl:variable name="durationMinutes" select="floor(xs:numeric($duration) div 60)"/>
-        <xsl:variable name="durationSeconds" select="floor(xs:numeric($duration) mod 60)"/>
+        <xsl:variable name="avalonSolrData" select="document($avalonSolrUrl)"/>
+        <xsl:variable name="avalonSolrDoc" select="$avalonSolrData/response/result/doc[1]" />
+        <xsl:variable name="duration_ssi" select="$avalonSolrDoc/str[@name='duration_ssi']/text()" />
+        <!-- <xsl:variable name="duration" select="substring-before(substring-after($videoData,'&quot;duration&quot;:'), ',')"/> -->
+        <xsl:variable name="durationHours" select="floor(xs:integer($duration_ssi) div 3600)"/>
+        <xsl:variable name="durationMinutes" select="floor(xs:integer($duration_ssi) div 60)"/>
+        <xsl:variable name="durationSeconds" select="floor(xs:integer($duration_ssi) mod 60)"/>
         <xsl:variable name="durationHoursStr" >
             <xsl:call-template name="formatDuration">
                 <xsl:with-param name="number" select="$durationHours" />
@@ -239,7 +244,7 @@
         <xsl:variable name="rawPublishedDate" select="format-date($parsedDate, '[Y0001][M01][D01]')"/>
         <xsl:variable name="formattedPublishedDate" select="format-date($parsedDate, '[Y0001]-[M01]-[D01]')"/>
         <xsl:variable name="format2PublishedDate" select="format-date($parsedDate, '[Y0001] [MNn] [D1]')"/>
-        <xsl:variable name="runtimeRounded" select="format-number(ceiling(xs:numeric($duration) div 60), '000')"/>
+        <xsl:variable name="runtimeRounded" select="format-number(ceiling(xs:integer($duration_ssi) div 60), '000')"/>
         <record>
             <leader><xsl:text>02170cgm a2200493 a 4500</xsl:text></leader>
             <controlfield tag="001"><xsl:value-of select="$id"/></controlfield>
