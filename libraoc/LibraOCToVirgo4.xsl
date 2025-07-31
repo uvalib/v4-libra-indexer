@@ -8,7 +8,8 @@
         <xsl:for-each select="/response/result">
             <add>
                 <!--                 <xsl:for-each select="doc"> -->
-                <xsl:for-each select="doc[arr[@name='has_model_ssim']/str = 'LibraWork']">
+            <xsl:for-each select="doc[arr[@name='has_model_ssim']/str = 'LibraWork']">
+            <xsl:sort select="str[@name='id']/text()" data-type="text" order="ascending"/>
             <doc>
                 <xsl:variable name="isThesis">
                     <xsl:call-template name="isThesis">

@@ -1,0 +1,1 @@
+http://dspace-staging-private.internal.lib.virginia.edu:8983/solr/search/select
