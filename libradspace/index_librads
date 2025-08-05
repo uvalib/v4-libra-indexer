@@ -46,7 +46,7 @@ fi
 #fi
 
 query=`cat $SCRIPTDIR/query.txt | sed -e 's/["]/%22/g' -e 's/[*]/%2A/g' -e 's/[[]/%5B/g' -e 's/[]]/%5D/g' -e 's/ /+/g'`
-parms='&wt=xml&fl=*'
+parms='&wt=xml&fl=handle,discoverable,withdrawn,dateIssued,title,author,dc.language,dc.description,dc.description.abstract,subject,dc.identifier.doi,dc.publisher,dc.identifier.uri,dc.description.sponsorship,dc.rights,dc.rights.uri,dc.type'
 downloaded=0
 let exit_code=0
 

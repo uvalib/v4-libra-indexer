@@ -60,11 +60,6 @@
                     <xsl:with-param name="title" select="arr[@name='title']/str[1]"/>
                     <xsl:with-param name="language" select="arr[@name='dc.language']/str"/>
                     </xsl:call-template></field>
-                <xsl:for-each select="arr[@name='mods_journal_title_info_t']">
-                    <field name="journal_title_tsearch_stored">
-                        <xsl:value-of select="str" />
-                    </field>
-                </xsl:for-each> 
                 <field name="work_title2_key_ssort_stored">
                     <xsl:variable name="title">
                         <xsl:call-template name="cleantitle" >
@@ -243,7 +238,7 @@
                 </xsl:for-each>
                 <xsl:if test="not(arr[@name='dc.rights.uri'])">
                     <xsl:choose>
-                        <xsl:when test="contains(arr[@name='rights_display_ssm']/str, 'NoC-US')" >
+                        <xsl:when test="contains(arr[@name='dc.rights']/str, 'NoC-US')" >
                             <field name="rs_uri_a">http://rightsstatements.org/vocab/NoC-US/1.0/</field>
                         </xsl:when>
                         <xsl:otherwise>

@@ -52,6 +52,8 @@ $SCRIPTDIR/libraetd/index_libraetd  $verbose $test $force -i $index
 
 $SCRIPTDIR/libraoc/index_libraoc  $verbose $test $force -i $index
 
+$SCRIPTDIR/libradspace/index_librads  $verbose $test $force -i $index
+
 $SCRIPTDIR/libradata/index_libradata  $verbose $test $force -i $index
 
 Verbose "Finished update of Virgo4 index for Libra items "`/bin/date "+%Y-%m-%d_%H:%M"`
