@@ -11,7 +11,7 @@ JAVA_MEM="-Xms1G -Xmx1G"
 
 verbose=
 force=
-test=-t
+test=
 index=staging:production
 while getopts :vfti: opt
  do
