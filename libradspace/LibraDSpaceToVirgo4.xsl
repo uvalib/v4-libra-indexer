@@ -11,7 +11,8 @@
                 <xsl:for-each select="doc">
                 <xsl:sort select="arr[@name='dc.identifier']/str/text()" data-type="text" order="ascending"/>
                 <doc>
-                    <field name="id"><xsl:value-of select="concat('ds_', str[@name='handle']/text())" /></field>
+                    <field name="id"><xsl:value-of select="concat('ds_', replace(str[@name='handle']/text(), '/', '_'))" /></field>
+                    <field name="handle_str_stored"><xsl:value-of select="str[@name='handle']/text()" /></field>
                     <field name="libraoc_id"><xsl:value-of select="concat('oc_', arr[@name='dc.identifier']/str/text())" /></field>
                 <!--             <field name="digital_collection_f_stored">Libra Repository</field>  -->
                 <field name="doc_type_f_stored">libra</field>
@@ -359,7 +360,7 @@
                 <xsl:text>Book</xsl:text>
             </xsl:when>
             <xsl:when test="arr[@name='dc.type']/str = 'Book chapter'" >
-                <xsl:text>Book</xsl:text>
+                <xsl:text>Part of Book</xsl:text>
             </xsl:when>
             <xsl:when test="arr[@name='dc.type']/str = 'Conference Proceeding'" >
                 <xsl:text>Conference Paper</xsl:text>
@@ -368,22 +369,22 @@
                 <xsl:text>Visual Materials</xsl:text>
             </xsl:when>
             <xsl:when test="arr[@name='dc.type']/str = 'Map'" >
-                <xsl:text>Map</xsl:text>
+                <xsl:text>Map or Cartographic Material</xsl:text>
             </xsl:when>
             <xsl:when test="arr[@name='dc.type']/str = 'Part of Book'" >
-                <xsl:text>Book Chapter</xsl:text>
+                <xsl:text>Part of Book</xsl:text>
             </xsl:when>
             <xsl:when test="arr[@name='dc.type']/str = 'Poster'" >
-                <xsl:text>Visual Materials</xsl:text>
+                <xsl:text>Poster</xsl:text>
             </xsl:when>
             <xsl:when test="arr[@name='dc.type']/str = 'Presentation'" >
-                <xsl:text>Visual Materials</xsl:text>
+                <xsl:text>Presentation</xsl:text>
             </xsl:when>
             <xsl:when test="arr[@name='dc.type']/str = 'Project'" >
-                <xsl:text>Working Paper</xsl:text>
+                <xsl:text>Project</xsl:text>
             </xsl:when>
             <xsl:when test="arr[@name='dc.type']/str = 'Technical Report'" >
-                <xsl:text>Technical report</xsl:text>
+                <xsl:text>Report</xsl:text>
             </xsl:when>
             <xsl:when test="arr[@name='dc.type']/str = 'Research Paper'" >
                 <xsl:text>Working Paper</xsl:text>
@@ -395,7 +396,7 @@
                 <xsl:text>Other Media</xsl:text>
             </xsl:when>
             <xsl:when test="arr[@name='dc.type']/str = 'Educational Resource'" >
-                <xsl:text>Other Media</xsl:text>
+                <xsl:text>Educational Resource</xsl:text>
             </xsl:when>
             <xsl:when test="arr[@name='dc.type']/str = 'Education'" >
                 <xsl:text>Other Media</xsl:text>
