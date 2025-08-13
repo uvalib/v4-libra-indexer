@@ -13,13 +13,15 @@
                 <doc>
                     <field name="id"><xsl:value-of select="concat('ds_', replace(str[@name='handle']/text(), '/', '_'))" /></field>
                     <field name="handle_str_stored"><xsl:value-of select="str[@name='handle']/text()" /></field>
-                    <field name="libraoc_id"><xsl:value-of select="concat('oc_', arr[@name='dc.identifier']/str/text())" /></field>
+                    <xsl:if test="arr[@name='dc.identifier']/str/text() != ''" >
+                        <field name="libraoc_id"><xsl:value-of select="concat('oc_', arr[@name='dc.identifier']/str/text())" /></field>
+                    </xsl:if>
                 <!--             <field name="digital_collection_f_stored">Libra Repository</field>  -->
                 <field name="doc_type_f_stored">libra</field>
                 <!--              <field name="source_facet">Libra2 Repository</field> -->
                 <field name="source_f_stored">Libra Repository</field>
                 <field name="digital_collection_f_stored">Libra Open Repository</field>
-                <field name="data_source_f_stored">librads</field>
+                <field name="data_source_f_stored">libraoc</field>
                 <field name="pool_f_stored">thesis</field>
                 <field name="location_f_stored">Internet Materials</field>
                 <field name="shadowed_location_f_stored">
@@ -199,7 +201,7 @@
                         <field name="subject_tsearchf_stored"><xsl:value-of select="."/></field>
                     </xsl:for-each>
                 </xsl:if>
-                    
+                <!--     
                 <xsl:choose>
                     <xsl:when test="contains(arr[@name='dc.identifier.doi']/str, 'doi:')">
                         <field name="url_str_stored">
@@ -209,27 +211,39 @@
                             <xsl:text>Access Online</xsl:text>
                         </field>
                     </xsl:when>
-                    <xsl:otherwise>
+                    <xsl:when test="arr[@name='dc.identifier.doi']/str != '' ">
                         <field name="url_str_stored">
                             <xsl:value-of select="concat($urlbase, arr[@name='dc.identifier.doi']/str)"/>
                         </field>
                         <field name="url_label_str_stored">
                             <xsl:text>Access Online</xsl:text>
                         </field>
-                    </xsl:otherwise>
-                </xsl:choose>
+                    </xsl:when>
+                    <xsl:otherwise />
+                </xsl:choose>  
+                -->
                 <xsl:call-template name="extract-department">
                     <xsl:with-param name="publisher" select="arr[@name='dc.publisher']/str[1]/text()" />
                 </xsl:call-template>
                 <xsl:for-each select="distinct-values(arr[@name='dc.identifier.uri']/str)">
-                    <xsl:if test="contains(., '.') and not(contains(., 'doi.org'))">
-                        <field name="url_supp_str_stored">
-                            <xsl:value-of select="."/>
-                        </field>
-                        <field name="url_label_supp_str_stored">
-                            <xsl:value-of select="'Related Materials'"/>
-                        </field>
-                    </xsl:if>
+                    <xsl:choose>
+                        <xsl:when test="contains(., 'datacite') or contains(., 'doi.org')">
+                            <field name="url_supp_str_stored">
+                                <xsl:value-of select="."/>
+                            </field>
+                            <field name="url_label_supp_str_stored">
+                                <xsl:value-of select="'Alternate Link'"/>
+                            </field>
+                        </xsl:when>
+                        <xsl:otherwise>
+                            <field name="url_str_stored">
+                                <xsl:value-of select="."/>
+                            </field>
+                            <field name="url_label_str_stored">
+                                <xsl:value-of select="'Libra Repository'"/>
+                            </field>
+                        </xsl:otherwise>
+                    </xsl:choose>
                 </xsl:for-each>
                     <xsl:for-each select="distinct-values(arr[@name='dc.description.sponsorship']/str)">
                     <field name="sponsoring_agency_tsearch_stored"><xsl:value-of select="."/></field>
@@ -362,7 +376,7 @@
             <xsl:when test="arr[@name='dc.type']/str = 'Book chapter'" >
                 <xsl:text>Part of Book</xsl:text>
             </xsl:when>
-            <xsl:when test="arr[@name='dc.type']/str = 'Conference Proceeding'" >
+            <xsl:when test="arr[@name='dc.type']/str = 'Conference Paper'" >
                 <xsl:text>Conference Paper</xsl:text>
             </xsl:when>
             <xsl:when test="arr[@name='dc.type']/str = 'Image'" >
@@ -402,10 +416,7 @@
                 <xsl:text>Other Media</xsl:text>
             </xsl:when>
             <xsl:when test="arr[@name='dc.type']/str = 'Learning Object'" >
-                <xsl:text>Other Media</xsl:text>
-            </xsl:when>
-            <xsl:when test="arr[@name='dc.type']/str = 'Funder'" >
-                <xsl:text>Other Media</xsl:text>
+                <xsl:text>Educational Resource</xsl:text>
             </xsl:when>
             <xsl:otherwise>
                 <xsl:text>Other Media</xsl:text>
