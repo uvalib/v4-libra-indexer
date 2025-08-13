@@ -48,7 +48,8 @@ mkdir -p $SCRIPTDIR/results
 Verbose " "
 Verbose "Starting update of Virgo4 index for Libra items "`/bin/date "+%Y-%m-%d_%H:%M"`
 
-$SCRIPTDIR/libraetd/index_libraetd  $verbose $test $force -i $index
+# handled by the new libraETD implementation
+#$SCRIPTDIR/libraetd/index_libraetd  $verbose $test $force -i $index
 
 $SCRIPTDIR/libraoc/index_libraoc  $verbose $test $force -i $index
 
