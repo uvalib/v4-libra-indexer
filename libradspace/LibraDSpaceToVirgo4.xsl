@@ -240,7 +240,7 @@
                                 <xsl:value-of select="."/>
                             </field>
                             <field name="url_label_str_stored">
-                                <xsl:value-of select="'Libra Repository'"/>
+                                <xsl:value-of select="'Access Online'"/>
                             </field>
                         </xsl:otherwise>
                     </xsl:choose>
