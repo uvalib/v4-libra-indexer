@@ -1,1 +1,1 @@
-search.resourcetype:Item NOT entityType:*
+entityType:"Publication" AND handle:*
