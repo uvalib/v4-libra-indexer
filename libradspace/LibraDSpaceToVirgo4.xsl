@@ -20,8 +20,8 @@
                 <field name="doc_type_f_stored">libra</field>
                 <!--              <field name="source_facet">Libra2 Repository</field> -->
                 <field name="source_f_stored">Libra Repository</field>
-                <field name="digital_collection_f_stored">Libra Open Repository</field>
-                <field name="data_source_f_stored">libraoc</field>
+                <field name="digital_collection_f_stored">Libra Dspace Repository</field>
+                <field name="data_source_f_stored">libradspace</field>
                 <field name="pool_f_stored">thesis</field>
                 <field name="location_f_stored">Internet Materials</field>
                 <field name="shadowed_location_f_stored">
