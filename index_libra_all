@@ -51,7 +51,8 @@ Verbose "Starting update of Virgo4 index for Libra items "`/bin/date "+%Y-%m-%d_
 # handled by the new libraETD implementation
 #$SCRIPTDIR/libraetd/index_libraetd  $verbose $test $force -i $index
 
-$SCRIPTDIR/libraoc/index_libraoc  $verbose $test $force -i $index
+# handled by the new libraDS implementation
+#$SCRIPTDIR/libraoc/index_libraoc  $verbose $test $force -i $index
 
 $SCRIPTDIR/libradspace/index_librads  $verbose $test $force -i $index
 
