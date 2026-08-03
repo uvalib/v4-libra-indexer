@@ -32,8 +32,8 @@
     <xsl:template match="doc">
         <xsl:if test="arr[@name='has_model_ssim']/str = 'MediaObject'">
             <doc>
-              <xsl:variable name="audio" select="arr[@name = 'avalon_resource_type_ssim']/str[text() = 'Sound Recording']"/>
-              <xsl:variable name="video" select="arr[@name = 'avalon_resource_type_ssim']/str[text() = 'Moving Image']"/>
+              <xsl:variable name="audio" select="arr[@name = 'avalon_resource_type_ssim']/str[lower-case(normalize-space(.)) = 'sound recording']"/>
+              <xsl:variable name="video" select="arr[@name = 'avalon_resource_type_ssim']/str[lower-case(normalize-space(.)) = 'moving image']"/>
               <xsl:variable name="avalonId" select="str[@name = 'id']/text()" />
               <xsl:variable name="solrId" select="concat('avalon_', $avalonId)" />
                  
