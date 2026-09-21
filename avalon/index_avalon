@@ -5,6 +5,9 @@ corename=$( basename $SCRIPTDIR )
 DATADIR=${SCRIPTDIR}/data
 BASEDIR=$( dirname $SCRIPTDIR )/common
 JAVA_MEM="-Xms512M -Xmx512M"
+# If the transform skips more than this many records (missing/unreadable MODS), assume something
+# is wrong upstream (e.g. Fedora down) and do not upload or queue deletions for that core.
+MAX_SKIPPED=20
 
 # load the shared bash functions log, vlog and Verbose
 . $BASEDIR/outputfuncs.bash
@@ -156,6 +159,15 @@ do
             fi
         done 
 
+        # Fedora answers with a plain-text "tombstone" message (not XML) for objects that were deleted
+        # from Fedora but are still listed in Avalon's solr. Name them so they can be cleaned up.
+        for pid in `cat ${DATADIR}/${corename}_${solrname}_ids_to_check.txt`
+        do
+            if head -c 200 $DATADIR/${modsdir}/${pid}_mods.xml 2> /dev/null | grep -q 'Discovered tombstone' ; then
+                echo "ERROR: Avalon id $pid ($solrname) is a tombstone in Fedora (deleted there) but still present in Avalon solr; it will be skipped" >&2
+            fi
+        done
+
         Verbose "Fetched total of $num_fetched MODS files to the mods directory"
 
         if [[ "$force" == "-f" ]]; then
@@ -179,8 +191,43 @@ do
             Verbose "Transforming the avalon/solr record dump into a new virgo/solr add document"
             Verbose "  using URL ${avalonsystemurl} as basis for url_a field"
 
-            java ${JAVA_MEM} -jar $BASEDIR/saxon9.jar  $DATADIR/${corename}_${solrname}_data.xml  $SCRIPTDIR/$transform modsdir="./data/${modsdir}/" urlbase="$avalonsystemurl" |
-                 sed -e 's/\\n/\&#10;/g' -e 's/<?xml version="1.0" encoding="UTF-8"?>//'  > $DATADIR/virgo4_${corename}_${solrname}.xml 2>&1 | vlog
+            # java's stderr (including <xsl:message> output such as the MODS language
+            # errors) is captured in this file rather than being lost or mixed into the output
+            transform_errors=$DATADIR/transform_errors_${solrname}.txt
+
+            java ${JAVA_MEM} -jar $BASEDIR/saxon9.jar  $DATADIR/${corename}_${solrname}_data.xml  $SCRIPTDIR/$transform modsdir="./data/${modsdir}/" urlbase="$avalonsystemurl" 2> $transform_errors |
+                 sed -e 's/\\n/\&#10;/g' -e 's/<?xml version="1.0" encoding="UTF-8"?>//'  > $DATADIR/virgo4_${corename}_${solrname}.xml
+            # must be read immediately: exit status of java (first command in the pipeline)
+            java_status=${PIPESTATUS[0]}
+
+            num_skipped=`grep -c 'record skipped' "$transform_errors"`
+            abort_reason=
+            if [[ "$java_status" != "0" ]] ; then
+                abort_reason="XSLT transform failed (java exit status $java_status)"
+            elif [[ "$num_skipped" -gt "$MAX_SKIPPED" ]] ; then
+                abort_reason="$num_skipped records were skipped for missing or unreadable MODS (limit is $MAX_SKIPPED); is Fedora reachable"
+            fi
+
+            if [[ -n "$abort_reason" ]] ; then
+                echo "ERROR: $solrname: $abort_reason. Nothing will be uploaded or deleted for $corename this run." >&2
+                cat "$transform_errors" | head -50 >&2
+                # put back the previous output (or discard the bad one if there was none)
+                if [[ -f $DATADIR/virgo4_${corename}_${solrname}.xml.bak ]] ; then
+                    mv $DATADIR/virgo4_${corename}_${solrname}.xml.bak $DATADIR/virgo4_${corename}_${solrname}.xml
+                else
+                    rm -f $DATADIR/virgo4_${corename}_${solrname}.xml
+                fi
+                # remove the data dump and its backup so the next run sees "changed" and retries the transform
+                rm -f $DATADIR/${corename}_${solrname}_data.xml $DATADIR/${corename}_${solrname}_data.xml.bak
+                continue
+            fi
+
+            if [[ -s "$transform_errors" ]] ; then
+                num_flagged=`grep -c 'ERROR:' "$transform_errors"`
+                num_lines=`wc -l < "$transform_errors"`
+                echo "WARNING: transform for $solrname wrote $num_lines line(s) of messages: $num_flagged flagged record problem(s) ('ERROR:' lines, $num_skipped of them skipped records); anything else is a Saxon error/warning. Details in $transform_errors" >&2
+                cat "$transform_errors" >&2
+            fi
             newdata=1
         fi
 

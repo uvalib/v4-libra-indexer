@@ -30,7 +30,15 @@
     </xsl:template>
     
     <xsl:template match="doc">
-        <xsl:if test="arr[@name='has_model_ssim']/str = 'MediaObject'">
+        <!-- MODS file for this record; doc-available() is false if it is missing, empty, or not well-formed XML
+             (e.g. Fedora returns a plain-text "tombstone" message for objects that were deleted from Fedora) -->
+        <xsl:variable name="mods_uri" select="concat($modsdir, str[@name = 'id']/text(), '_mods.xml')"/>
+        <xsl:if test="arr[@name='has_model_ssim']/str = 'MediaObject' and not(doc-available($mods_uri))">
+            <xsl:message terminate="no">
+                <xsl:value-of select="concat('ERROR: Avalon id ', str[@name = 'id']/text(), ': MODS file ', $mods_uri, ' is missing or is not well-formed XML; record skipped (not added to output)')"/>
+            </xsl:message>
+        </xsl:if>
+        <xsl:if test="arr[@name='has_model_ssim']/str = 'MediaObject' and doc-available($mods_uri)">
             <doc>
               <xsl:variable name="audio" select="arr[@name = 'avalon_resource_type_ssim']/str[lower-case(normalize-space(.)) = 'sound recording']"/>
               <xsl:variable name="video" select="arr[@name = 'avalon_resource_type_ssim']/str[lower-case(normalize-space(.)) = 'moving image']"/>
@@ -58,16 +66,17 @@
               <field name="source_f_stored">Avalon</field>
               <field name="source_f_stored">UVA Library Digital Repository</field>
               <field name="data_source_str_stored">avalon</field>
-              <xsl:variable name="lang_name">
-                  <xsl:choose>
-                      <xsl:when test="mods:language/mods:languageTerm[@type='text']/text() != ''">
-                          <xsl:value-of select="mods:language/mods:languageTerm[@type='text']/text()" />
-                      </xsl:when>
-                      <xsl:otherwise>
-                          <xsl:value-of select="'English'" />
-                      </xsl:otherwise>
-                  </xsl:choose>
-              </xsl:variable>
+              <!-- Languages named in the MODS (text form), in document order, blanks and duplicates removed -->
+              <xsl:variable name="lang_terms"
+                  select="$mods_doc/mods:mods/mods:language/mods:languageTerm[@type='text'][normalize-space(.) != ''][not(normalize-space(.) = preceding::mods:languageTerm[@type='text']/normalize-space(.))]"/>
+              <!-- First language drives article-stripping in cleantitle; default English if none given -->
+              <xsl:variable name="lang_name" select="if (exists($lang_terms)) then normalize-space($lang_terms[1]) else 'English'"/>
+              <!-- Flag any <language> that has a code term but no (non-blank) text term -->
+              <xsl:for-each select="$mods_doc/mods:mods/mods:language[mods:languageTerm[@type='code']][not(mods:languageTerm[@type='text'][normalize-space(.) != ''])]">
+                  <xsl:message terminate="no">
+                      <xsl:value-of select="concat('ERROR: Avalon id ', $avalonId, ': MODS language has languageTerm type=code (', string-join(mods:languageTerm[@type='code']/normalize-space(.), ','), ') but no languageTerm type=text; no language_f_stored value emitted for it')"/>
+                  </xsl:message>
+              </xsl:for-each>
               <xsl:variable name="default_title">
                   <xsl:choose>
                       <xsl:when test="str[@name = 'title_tesi']/text()">
@@ -180,9 +189,17 @@
                       <field name="identifier_e_stored"><xsl:value-of select="./text()"/></field>
                   </xsl:for-each>
               </xsl:if>
-              <field name="language_f_stored">
-                  <xsl:value-of select="$lang_name"/>
-              </field>
+              <xsl:choose>
+                  <xsl:when test="exists($lang_terms)">
+                      <xsl:for-each select="$lang_terms">
+                          <field name="language_f_stored"><xsl:value-of select="normalize-space(.)"/></field>
+                      </xsl:for-each>
+                  </xsl:when>
+                  <xsl:when test="not($mods_doc/mods:mods/mods:language)">
+                      <!-- no language given at all: keep historical default -->
+                      <field name="language_f_stored">English</field>
+                  </xsl:when>
+              </xsl:choose>
               <xsl:if test="str[@name='date_created_ssim']/text() != ''">
                   <xsl:variable name="dateCreated" select="str[@name='date_created_ssim']/text()" />
                   <field name="date_received_f_stored">
