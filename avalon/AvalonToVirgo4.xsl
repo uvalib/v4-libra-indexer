@@ -346,19 +346,20 @@ Director of Photography: ...") rather than as a proper mods:name with role code 
         <xsl:variable name="roleLabel" select="lower-case($roleLabelParts)"/>
         <xsl:choose>
             <xsl:when test="$roleCode = 'drt'">
-                <field name="author_director_tsearch_stored"><xsl:value-of select="$name" /></field>                
+                <field name="author_director_tsearch_stored"><xsl:value-of select="$name" /></field>
+                <field name="author_added_entry_tsearch_stored"><xsl:value-of select="$name" /></field>
             </xsl:when>
             <xsl:when test="$roleCode = 'aut'">
                 <field name="author_tsearchf_stored"><xsl:value-of select="$name" /></field>
             </xsl:when>
             <xsl:when test="$roleCode = 'prf'">
                 <field name="performers_tsearch_stored"><xsl:value-of select="$name" /></field>
+                <field name="author_added_entry_tsearch_stored"><xsl:value-of select="$name" /></field>
             </xsl:when>
             <xsl:otherwise>
                 <field name="author_tsearchf_stored"><xsl:value-of select="concat($name, ' (', $roleLabel, ')')" /></field>
             </xsl:otherwise>
         </xsl:choose>
-        <field name="author_added_entry_tsearch_stored"><xsl:value-of select="$name" /></field>
     </xsl:template>
 
     <xsl:template match="*" mode="string-join-mode">
