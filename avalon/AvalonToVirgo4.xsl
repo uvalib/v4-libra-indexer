@@ -177,35 +177,64 @@
               </xsl:for-each>
 
               <!-- Some records give the director only as a line of text buried in the MODS file's own
-                   <note type="creation/production credits"> (e.g. "Producers: ...
-Director: Olivier Laxe
-Director of Photography: ...") rather than as a proper mods:name with role code "drt". Only look for
-                   that fallback when the MODS doesn't already supply a proper director name, so a
-                   record with both doesn't get the name twice. This reads the note directly from the
-                   per-record MODS file ($mods_doc), not from any flattened copy in the Solr dump.
+                   <note type="creation/production credits"> rather than as a proper mods:name with role
+                   code "drt". Only look for that fallback when the MODS doesn't already supply a proper
+                   director name, so a record with both doesn't get the name twice. This reads the note
+                   directly from the per-record MODS file ($mods_doc), not from any flattened copy in the
+                   Solr dump.
 
-                   The line-match regex accepts a plain "Director:" label or the bilingual
-                   "Director / Director:" form seen in some records (e.g. Spanish-language credits where
-                   the translated label happens to repeat the word "Director"); it does not try to match
-                   other bilingual pairings ("Director / Director of Photography:" is correctly excluded
-                   because the second word isn't "Director"). It deliberately does NOT match a bare
-                   "Director" line with no colon, or a "Name (Director)" display line; both appear
-                   in the real data (e.g. "Carina Sama (Director)") but without a colon there's no
-                   reliable boundary between label and name, and in every record checked the same
-                   director's name was also present in a proper "Director:" line elsewhere, so skipping
-                   the colon-less forms doesn't lose anyone in practice. One real record (an older,
-                   unlabeled "Director Maurice Schwartz / Producer Harry Ziskin / ..." original-release
-                   credit block, sitting alongside a modern "Director: Henry Felt" restoration credit
-                   block in the same field) is a case where the colon-less name is real but matching it
-                   generically would be too risky elsewhere, so it is intentionally left for manual
-                   review rather than guessed at.
+                   A corpus-wide scan (scan_director_patterns.py) found the credits note uses several
+                   distinct conventions across records, not just one. Real newlines and semicolons both
+                   separate one role/name group from the next (sometimes a note uses one, sometimes the
+                   other, sometimes a single very long semicolon-separated line), so both are normalized
+                   to the same delimiter first, then each resulting segment is classified and handled by
+                   one of three templates, tried in this order:
 
-                   After the label, capture runs to the end of the line (a real newline, matching the
-                   common case), then two cleanup passes trim it back to just the name(s) for the two
-                   real records where several roles share one line: a leading cut at the first "|" (e.g.
-                   "Director: X | Producer: Y | ..."), then a cut at the first ". <Capitalized word>:"
-                   (e.g. "Director: X. Cinematography: Y."). distinct-values() drops a duplicate if the
-                   same text happens to repeat across multiple matching notes. -->
+                   1. emitNarrativeCreditNames: "(Co-)?Directed by <name>" (e.g. "Directed by Donna
+                      Read"), a verb-phrase form distinct from the other two since there's no colon or
+                      comma between the label and the name.
+
+                   2. emitColonCreditNames: "<label>: <name(s)>", where <label> is accepted if it
+                      contains "director(s)", "co-director(s)", "directing", or "direction" as a whole
+                      word; whether alone ("Director:"), paired with another role ("Script and
+                      Directing:"), or repeated bilingually ("Director / Director:", e.g. Spanish-
+                      language credits using the same word twice); and rejected if that word is
+                      preceded by a qualifier like "art"/"music"/"casting"/etc. or followed by "of ..."
+                      (so "Director of Photography:", "Artistic Director:", and similar non-director
+                      roles stay excluded). Because the colon unambiguously separates label from name,
+                      this check can safely accept an arbitrarily long compound label; there's no risk
+                      of misreading which comma-separated word is a name.
+
+                   3. emitCommaCreditNames: "<role(s)>, <name(s)>" with NO colon at all (the classic MARC
+                      statement-of-responsibility convention, e.g. "Director, Gerry Pomeroy" or
+                      "Producer, director, cinematographer, Mai Iskander"), or the reversed "<name>,
+                      <role(s)>" (e.g. "Yuval Sharon, Director"). Unlike the colon case, a comma is used
+                      for BOTH separating multiple roles from each other AND separating the role list
+                      from the name(s), so which comma-separated token is "the name" is genuinely
+                      ambiguous without knowing the specific role words involved. To stay safe, this
+                      checks each leading token against a short, deliberately incomplete list of common
+                      companion roles (producer, writer, editor, composer, cinematographer, and a few
+                      others; see $OTHER_ROLE_WORDS below) and only extracts names once it finds a
+                      point where the recognized-role-word run ends and at least one of those leading
+                      words was a director word; everything after that point is taken as the name(s).
+                      A segment with an unrecognized leading role word (e.g. one not in that short list)
+                      is left alone rather than guessed at, so an incomplete role vocabulary causes
+                      missed credits, not wrong ones.
+
+                   Deliberately NOT handled, since none of the real examples found gave a safe way to
+                   extract a name: a bare "Director" line with no name on it; a "Name (Director)" or
+                   "Name (co-directors)" parenthetical display form (ambiguous how far back a "(...
+                   co-directors)" tag applies over a preceding list of several names); and a colon-less,
+                   comma-less "Director Name" sitting next to other unlabeled, comma-less role/name pairs
+                   in the same older-style credit block (matching it generically risks grabbing the wrong
+                   word as a name elsewhere). These are left for manual review.
+
+                   Each of the three templates ends by calling emitCreditNames on whatever text it
+                   decided was "the name(s) portion", which applies two further cleanup passes for
+                   records where several roles still share that text: a leading cut at the first "|"
+                   (e.g. "Director: X | Producer: Y | ..."), then a cut at the first ". <Capitalized
+                   word>:" (e.g. "Director: X. Cinematography: Y."), before splitting on remaining commas.
+                   distinct-values() drops a duplicate if the same name is produced more than once. -->
               <xsl:variable name="has_mods_director" select="exists($mods_doc/mods:mods/mods:name[mods:role/mods:roleTerm[@type='code'] = 'drt'])"/>
               <xsl:if test="not($has_mods_director)">
                   <xsl:variable name="director_names_from_notes">
@@ -215,23 +244,34 @@ Director of Photography: ...") rather than as a proper mods:name with role code 
                                XML parser) followed by an ordinary newline. XPath's regex "." does not
                                match that literal CR, but "$" in multiline mode anchors only right before
                                the LF, one character further along, so a line ending in \r\n never
-                               satisfies "(.+)$" at all and the whole line silently fails to match. Strip
-                               CR characters before matching so only LF is left as the line separator. -->
+                               satisfies a "$"-anchored match at all. Strip CR first; then normalize real
+                               newlines to the same "; " delimiter already used between roles on a single
+                               line, so one segment list covers both conventions. -->
                           <xsl:variable name="note_text_no_cr" select="translate(., '&#13;', '')"/>
-                          <xsl:analyze-string select="$note_text_no_cr" regex="^Director([ \t]*/[ \t]*Director)?[ \t]*:[ \t]*(.+)$" flags="m">
-                              <xsl:matching-substring>
-                                  <xsl:variable name="raw_line" select="regex-group(2)"/>
-                                  <xsl:variable name="no_pipe" select="if (contains($raw_line, '|')) then substring-before($raw_line, '|') else $raw_line"/>
-                                  <xsl:variable name="cut">
-                                      <xsl:analyze-string select="$no_pipe" regex="\.\s+[A-Z][A-Za-z/ ]*:.*$" flags="s">
-                                          <xsl:non-matching-substring><xsl:value-of select="."/></xsl:non-matching-substring>
-                                      </xsl:analyze-string>
-                                  </xsl:variable>
-                                  <xsl:for-each select="tokenize(normalize-space($cut), ',\s*')[normalize-space(.) != '']">
-                                      <name><xsl:value-of select="normalize-space(.)"/></name>
-                                  </xsl:for-each>
-                              </xsl:matching-substring>
-                          </xsl:analyze-string>
+                          <xsl:variable name="normalized" select="replace($note_text_no_cr, '\n', '; ')"/>
+                          <xsl:for-each select="tokenize($normalized, ';')">
+                              <xsl:variable name="segment" select="normalize-space(.)"/>
+                              <xsl:if test="$segment != ''">
+                                  <xsl:choose>
+                                      <xsl:when test="matches($segment, '^([Cc]o-?)?[Dd]irected by[ \t]*.+$')">
+                                          <xsl:call-template name="emitNarrativeCreditNames">
+                                              <xsl:with-param name="segment" select="$segment"/>
+                                          </xsl:call-template>
+                                      </xsl:when>
+                                      <xsl:when test="contains($segment, ':')">
+                                          <xsl:call-template name="emitColonCreditNames">
+                                              <xsl:with-param name="label" select="normalize-space(substring-before($segment, ':'))"/>
+                                              <xsl:with-param name="value" select="substring-after($segment, ':')"/>
+                                          </xsl:call-template>
+                                      </xsl:when>
+                                      <xsl:otherwise>
+                                          <xsl:call-template name="emitCommaCreditNames">
+                                              <xsl:with-param name="segment" select="$segment"/>
+                                          </xsl:call-template>
+                                      </xsl:otherwise>
+                                  </xsl:choose>
+                              </xsl:if>
+                          </xsl:for-each>
                       </xsl:for-each>
                   </xsl:variable>
                   <xsl:for-each select="distinct-values($director_names_from_notes/name/text())">
@@ -346,7 +386,7 @@ Director of Photography: ...") rather than as a proper mods:name with role code 
         <xsl:variable name="roleLabel" select="lower-case($roleLabelParts)"/>
         <xsl:choose>
             <xsl:when test="$roleCode = 'drt'">
-                <field name="author_director_tsearch_stored"><xsl:value-of select="$name" /></field>
+                <field name="author_director_tsearch_stored"><xsl:value-of select="$name" /></field> 
                 <field name="author_added_entry_tsearch_stored"><xsl:value-of select="$name" /></field>
             </xsl:when>
             <xsl:when test="$roleCode = 'aut'">
@@ -593,6 +633,103 @@ Director of Photography: ...") rather than as a proper mods:name with role code 
         <!-- record change date -->
     </xsl:template>
     
+    <!-- Shared cleanup for a captured credit-line value (everything after a "Director:" or
+         "Directed by" label): cuts off a following role sharing the same line, then splits
+         remaining comma-separated names into individual <name> elements. Used by the director
+         fallback above; kept here so both label patterns stay in sync. -->
+    <!-- "(Co-)?Directed by <name>"; a verb-phrase credit with no colon or comma between label and
+         name (e.g. "Directed by Donna Read", "Co-directed by X and Y"). -->
+    <xsl:template name="emitNarrativeCreditNames">
+        <xsl:param name="segment" required="yes"/>
+        <xsl:analyze-string select="$segment" regex="^([Cc]o-?)?[Dd]irected by[ \t]*(.+)$">
+            <xsl:matching-substring>
+                <xsl:call-template name="emitCreditNames">
+                    <xsl:with-param name="raw_line" select="regex-group(2)"/>
+                </xsl:call-template>
+            </xsl:matching-substring>
+        </xsl:analyze-string>
+    </xsl:template>
+
+    <!-- "<label>: <name(s)>" where <label> names a directing role, possibly combined with other
+         roles. Safe to accept an arbitrarily long/compound label here because the colon marks the
+         name's start unambiguously, unlike the comma-only case below. -->
+    <xsl:template name="emitColonCreditNames">
+        <xsl:param name="label" required="yes"/>
+        <xsl:param name="value" required="yes"/>
+        <xsl:variable name="label_lc" select="lower-case($label)"/>
+        <xsl:variable name="has_director_word"
+            select="matches($label_lc, '(^|[^a-z])(co-?)?directors?([^a-z]|$)') or
+                    matches($label_lc, '(^|[^a-z])directing([^a-z]|$)') or
+                    matches($label_lc, '(^|[^a-z])direction([^a-z]|$)')"/>
+        <xsl:variable name="is_false_friend"
+            select="matches($label_lc, '(art|artistic|music(al)?|stage|production|project|photograph(y|ic)|animation|medical|casting|technical|dance|editing|executive|creative|associate|assistant)[ ]+directors?') or
+                    matches($label_lc, 'directors?[ ]+of[ ]')"/>
+        <xsl:if test="$has_director_word and not($is_false_friend)">
+            <xsl:call-template name="emitCreditNames">
+                <xsl:with-param name="raw_line" select="$value"/>
+            </xsl:call-template>
+        </xsl:if>
+    </xsl:template>
+
+    <!-- "<role(s)>, <name(s)>" or "<name>, <role(s)>" with no colon at all (the MARC statement-of-
+         responsibility convention). A comma here does double duty; separating roles from each other
+         AND separating the role list from the name; so this only extracts a name where that boundary
+         can be found safely: either a short, exact "<name>, Director" reversal, or a run of leading
+         tokens that ALL match a short recognized-role vocabulary (with at least one being a director
+         word), in which case everything after that run is treated as the name(s). An unrecognized
+         leading role word stops the check rather than guessing. $OTHER_ROLE_WORDS is intentionally
+         short and incomplete; extend it if a later scan finds more common companion roles. -->
+    <xsl:template name="emitCommaCreditNames">
+        <xsl:param name="segment" required="yes"/>
+        <xsl:variable name="DIRECTOR_WORD" select="'^(co-?)?directors?$'"/>
+        <xsl:variable name="DIRECTOR_WORD_COMPOUND" select="'^(co-?)?directors?([ ]*(&amp;|and)[ ]*[a-z][a-z ]{0,30})?$'"/>
+        <xsl:variable name="OTHER_ROLE_WORDS"
+            select="'^(executive |co-|associate |assistant )?(produc(er|tion)|writ(er|ing)|edit(or|ing)|compos(er)|cinematographer|narrator|presenter|screenwriter)s?$|^(script|screenplay|story|sound|music(al)?|camera|production|cast(ing)?|dp)$'"/>
+        <xsl:variable name="tokens" select="for $t in tokenize($segment, ',') return normalize-space($t)"/>
+        <xsl:variable name="n" select="count($tokens)"/>
+        <xsl:choose>
+            <!-- Reversed "Name, Director" / "Name, Director &amp; Costume Designer": exactly two
+                 tokens, the second is purely a director word (optionally with one extra role via
+                 &amp;/and), and the first doesn't itself look like a role word. -->
+            <xsl:when test="$n = 2 and matches(lower-case($tokens[2]), $DIRECTOR_WORD_COMPOUND)
+                             and not(matches(lower-case($tokens[1]), $DIRECTOR_WORD))
+                             and not(matches(lower-case($tokens[1]), $OTHER_ROLE_WORDS))">
+                <xsl:call-template name="emitCreditNames">
+                    <xsl:with-param name="raw_line" select="$tokens[1]"/>
+                </xsl:call-template>
+            </xsl:when>
+            <xsl:otherwise>
+                <!-- Forward "<role(s)>, <name(s)>": find the longest run of leading tokens (checked up
+                     to 4, which covers every real compound-role case seen) that all match a recognized
+                     role word, then require at least one of them to be a director word. -->
+                <xsl:variable name="prefixLen" select="
+                    if ($n ge 5 and (every $t in subsequence($tokens, 1, 4) satisfies (matches(lower-case($t), $DIRECTOR_WORD) or matches(lower-case($t), $OTHER_ROLE_WORDS)))) then 4
+                    else if ($n ge 4 and (every $t in subsequence($tokens, 1, 3) satisfies (matches(lower-case($t), $DIRECTOR_WORD) or matches(lower-case($t), $OTHER_ROLE_WORDS)))) then 3
+                    else if ($n ge 3 and (every $t in subsequence($tokens, 1, 2) satisfies (matches(lower-case($t), $DIRECTOR_WORD) or matches(lower-case($t), $OTHER_ROLE_WORDS)))) then 2
+                    else if ($n ge 2 and matches(lower-case($tokens[1]), $DIRECTOR_WORD)) then 1
+                    else 0"/>
+                <xsl:if test="$prefixLen gt 0 and (some $t in subsequence($tokens, 1, $prefixLen) satisfies matches(lower-case($t), $DIRECTOR_WORD))">
+                    <xsl:for-each select="subsequence($tokens, $prefixLen + 1)[normalize-space(.) != '']">
+                        <name><xsl:value-of select="normalize-space(.)"/></name>
+                    </xsl:for-each>
+                </xsl:if>
+            </xsl:otherwise>
+        </xsl:choose>
+    </xsl:template>
+
+    <xsl:template name="emitCreditNames">
+        <xsl:param name="raw_line" required="yes"/>
+        <xsl:variable name="no_pipe" select="if (contains($raw_line, '|')) then substring-before($raw_line, '|') else $raw_line"/>
+        <xsl:variable name="cut">
+            <xsl:analyze-string select="$no_pipe" regex="\.\s+[A-Z][A-Za-z/ ]*:.*$" flags="s">
+                <xsl:non-matching-substring><xsl:value-of select="."/></xsl:non-matching-substring>
+            </xsl:analyze-string>
+        </xsl:variable>
+        <xsl:for-each select="tokenize(normalize-space($cut), ',\s*')[normalize-space(.) != '']">
+            <name><xsl:value-of select="normalize-space(.)"/></name>
+        </xsl:for-each>
+    </xsl:template>
+
     <xsl:template name="stripParentheticRole">
         <xsl:param name="value" required="yes"/>
         <!-- Without flags="m", $ anchors strictly at the end of the whole string. If $value ever has
