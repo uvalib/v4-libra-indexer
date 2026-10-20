@@ -175,6 +175,69 @@
               <xsl:for-each select="arr[@name='notes_tesim']/str">
                   <field name="notes_tsearch_stored"><xsl:value-of select="normalize-space(string(.))"/></field>
               </xsl:for-each>
+
+              <!-- Some records give the director only as a line of text buried in the MODS file's own
+                   <note type="creation/production credits"> (e.g. "Producers: ...
+Director: Olivier Laxe
+Director of Photography: ...") rather than as a proper mods:name with role code "drt". Only look for
+                   that fallback when the MODS doesn't already supply a proper director name, so a
+                   record with both doesn't get the name twice. This reads the note directly from the
+                   per-record MODS file ($mods_doc), not from any flattened copy in the Solr dump.
+
+                   The line-match regex accepts a plain "Director:" label or the bilingual
+                   "Director / Director:" form seen in some records (e.g. Spanish-language credits where
+                   the translated label happens to repeat the word "Director"); it does not try to match
+                   other bilingual pairings ("Director / Director of Photography:" is correctly excluded
+                   because the second word isn't "Director"). It deliberately does NOT match a bare
+                   "Director" line with no colon, or a "Name (Director)" display line; both appear
+                   in the real data (e.g. "Carina Sama (Director)") but without a colon there's no
+                   reliable boundary between label and name, and in every record checked the same
+                   director's name was also present in a proper "Director:" line elsewhere, so skipping
+                   the colon-less forms doesn't lose anyone in practice. One real record (an older,
+                   unlabeled "Director Maurice Schwartz / Producer Harry Ziskin / ..." original-release
+                   credit block, sitting alongside a modern "Director: Henry Felt" restoration credit
+                   block in the same field) is a case where the colon-less name is real but matching it
+                   generically would be too risky elsewhere, so it is intentionally left for manual
+                   review rather than guessed at.
+
+                   After the label, capture runs to the end of the line (a real newline, matching the
+                   common case), then two cleanup passes trim it back to just the name(s) for the two
+                   real records where several roles share one line: a leading cut at the first "|" (e.g.
+                   "Director: X | Producer: Y | ..."), then a cut at the first ". <Capitalized word>:"
+                   (e.g. "Director: X. Cinematography: Y."). distinct-values() drops a duplicate if the
+                   same text happens to repeat across multiple matching notes. -->
+              <xsl:variable name="has_mods_director" select="exists($mods_doc/mods:mods/mods:name[mods:role/mods:roleTerm[@type='code'] = 'drt'])"/>
+              <xsl:if test="not($has_mods_director)">
+                  <xsl:variable name="director_names_from_notes">
+                      <xsl:for-each select="$mods_doc/mods:mods/mods:note[@type='creation/production credits']">
+                          <!-- Some MODS files encode Windows-style line breaks as an explicit &#xD; entity
+                               (a real, literal carriage return, deliberately not normalized away by the
+                               XML parser) followed by an ordinary newline. XPath's regex "." does not
+                               match that literal CR, but "$" in multiline mode anchors only right before
+                               the LF, one character further along, so a line ending in \r\n never
+                               satisfies "(.+)$" at all and the whole line silently fails to match. Strip
+                               CR characters before matching so only LF is left as the line separator. -->
+                          <xsl:variable name="note_text_no_cr" select="translate(., '&#13;', '')"/>
+                          <xsl:analyze-string select="$note_text_no_cr" regex="^Director([ \t]*/[ \t]*Director)?[ \t]*:[ \t]*(.+)$" flags="m">
+                              <xsl:matching-substring>
+                                  <xsl:variable name="raw_line" select="regex-group(2)"/>
+                                  <xsl:variable name="no_pipe" select="if (contains($raw_line, '|')) then substring-before($raw_line, '|') else $raw_line"/>
+                                  <xsl:variable name="cut">
+                                      <xsl:analyze-string select="$no_pipe" regex="\.\s+[A-Z][A-Za-z/ ]*:.*$" flags="s">
+                                          <xsl:non-matching-substring><xsl:value-of select="."/></xsl:non-matching-substring>
+                                      </xsl:analyze-string>
+                                  </xsl:variable>
+                                  <xsl:for-each select="tokenize(normalize-space($cut), ',\s*')[normalize-space(.) != '']">
+                                      <name><xsl:value-of select="normalize-space(.)"/></name>
+                                  </xsl:for-each>
+                              </xsl:matching-substring>
+                          </xsl:analyze-string>
+                      </xsl:for-each>
+                  </xsl:variable>
+                  <xsl:for-each select="distinct-values($director_names_from_notes/name/text())">
+                      <field name="author_director_tsearch_stored"><xsl:value-of select="."/></field>
+                  </xsl:for-each>
+              </xsl:if>
               
               <xsl:if test="str[@name='summary_ssi']/text() != ''">
                   <field name="abstract_tsearch_stored"><xsl:value-of select="str[@name='summary_ssi']/text()" /></field>
@@ -531,12 +594,19 @@
     
     <xsl:template name="stripParentheticRole">
         <xsl:param name="value" required="yes"/>
-        <xsl:analyze-string select="$value" regex="^(.*) \([^(]+\)$">
+        <!-- Without flags="m", $ anchors strictly at the end of the whole string. If $value ever has
+             a trailing CR (the same &#xD;-entity encoding seen in MODS note fields; see the Director
+             extraction fallback above for the full explanation), the match silently fails: "." can't
+             consume the CR, and "$" sits one character further along, right after it. No real namePart
+             in the current sample data has this, but the fix is cheap and this template runs on every
+             mods:name in the record, so it's stripped here too for safety. -->
+        <xsl:variable name="clean_value" select="translate($value, '&#13;', '')"/>
+        <xsl:analyze-string select="$clean_value" regex="^(.*) \([^(]+\)$">
             <xsl:matching-substring>
                 <xsl:value-of select="regex-group(1)"/>
             </xsl:matching-substring>
             <xsl:non-matching-substring>
-                <xsl:value-of select="$value"/>
+                <xsl:value-of select="$clean_value"/>
             </xsl:non-matching-substring>
         </xsl:analyze-string>
     </xsl:template>
